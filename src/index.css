@@ -1,0 +1,35 @@
+@import "tailwindcss";
+
+/* Tùy chỉnh Scrollbar Dark Theme cho Webkit (Chrome, Edge, Safari, Brave) */
+::-webkit-scrollbar {
+  width: 6px;               /* Độ mảnh thanh cuộn dọc */
+  height: 6px;              /* Độ mảnh thanh cuộn ngang */
+}
+
+/* Nền đường rãnh trượt (Track) */
+::-webkit-scrollbar-track {
+  background: #020617;      /* Màu slate-950 tiệp với nền web */
+}
+
+/* Con lăn kéo (Thumb) */
+::-webkit-scrollbar-thumb {
+  background: #1e293b;      /* Màu slate-800 */
+  border-radius: 9999px;    /* Bo tròn mềm mại */
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+/* Khi rê chuột vào con lăn */
+::-webkit-scrollbar-thumb:hover {
+  background: #334155;      /* Màu slate-700 sáng hơn khi tương tác */
+}
+
+/* Khi đang nhấn giữ con lăn */
+::-webkit-scrollbar-thumb:active {
+  background: #06b6d4;      /* Màu cyan-500 ánh sáng nhấn */
+}
+
+/* Hỗ trợ chuẩn trên trình duyệt Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #1e293b #020617;
+}
