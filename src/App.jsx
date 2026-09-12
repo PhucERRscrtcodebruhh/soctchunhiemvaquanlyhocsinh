@@ -6,13 +6,20 @@ import {
   ArrowRight, UserPlus, FileText, ExternalLink, Database,
   Calendar, Clock, UserCheck, ShieldAlert, FileSpreadsheet,
   HeartHandshake, ClipboardList, TrendingUp, AlertOctagon, 
-  CalendarDays, MessagesSquare, Sun, Snowflake, CheckCheck
+  CalendarDays, MessagesSquare, Sun, Snowflake, CheckCheck,
+  ChevronLeft, ChevronRight, Home, Compass
 } from 'lucide-react';
 
 export default function App() {
   const [authView, setAuthView] = useState('login');
   const [currentUser, setCurrentUser] = useState(null);
-  const [activeTab, setActiveTab] = useState('dashboard');
+  
+  // Tab mặc định khi vào là Trang Chủ
+  const [activeTab, setActiveTab] = useState('home'); 
+  
+  // Trạng thái thu gọn/mở rộng sidebar
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
 
@@ -168,14 +175,14 @@ export default function App() {
     setCurrentUser(null);
     setLoginUsername('');
     setLoginPassword('');
-    setActiveTab('dashboard');
+    setActiveTab('home');
   };
 
-  // Danh mục menu điều hướng
   const menuCategories = [
     {
-      group: "HỆ THỐNG & QUY ĐỊNH",
+      group: "ĐIỀU HÀNH & QUY ĐỊNH",
       items: [
+        { id: 'home', label: 'Trang chủ cổng trường', icon: <Home className="w-4 h-4" /> },
         { id: 'dashboard', label: 'Bàn làm việc tổng quan', icon: <LayoutDashboard className="w-4 h-4" /> },
         { id: 'regulation', label: 'Thông tư 22/2021/TT-BGDĐT', icon: <FileText className="w-4 h-4" /> }
       ]
@@ -222,20 +229,36 @@ export default function App() {
   ];
 
   // ==========================================
-  // VIEW: GIAO DIỆN AUTH
+  // VIEW: AUTH
   // ==========================================
   if (!currentUser) {
     return (
-      <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center p-4 font-sans selection:bg-cyan-500 selection:text-white">
-        <div className="fixed inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute -top-40 -left-40 w-96 h-96 bg-cyan-600/10 rounded-full blur-3xl" />
-          <div className="absolute -bottom-40 -right-40 w-96 h-96 bg-blue-600/10 rounded-full blur-3xl" />
+      <div 
+        className="min-h-screen text-slate-100 flex items-center justify-center p-4 font-sans selection:bg-cyan-500 selection:text-white bg-cover bg-center bg-no-repeat relative"
+        style={{ backgroundImage: `url('./bg-khaigiang.jpg')` }}
+      >
+        <div className="absolute inset-0 bg-slate-950/60" />
+
+        <div className="absolute top-6 left-6 flex items-center gap-3 z-10">
+          <img 
+            src="./logo-phucu.png" 
+            alt="Logo Trường THPT Phù Cừ" 
+            className="w-12 h-12 object-contain drop-shadow-md"
+          />
+          <div>
+            <h2 className="text-sm font-bold tracking-wide text-white uppercase drop-shadow">
+              TRƯỜNG THPT PHÙ CỪ
+            </h2>
+            <span className="text-[11px] text-cyan-300 font-mono drop-shadow">
+              Năm học 2026 - 2027
+            </span>
+          </div>
         </div>
 
-        <div className="relative w-full max-w-lg bg-slate-900/80 backdrop-blur-xl border border-slate-800 p-8 rounded-2xl shadow-2xl shadow-black/80">
+        <div className="relative z-10 w-full max-w-lg bg-slate-900 border border-slate-800 p-8 rounded-2xl shadow-2xl shadow-black">
           <div className="text-center mb-6">
             <span className="px-3 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 text-[11px] font-semibold tracking-wide uppercase inline-block mb-3">
-              {classState.schoolName}
+              TRƯỜNG THPT PHÙ CỪ
             </span>
             <h1 className="text-xl font-bold tracking-tight text-white leading-snug">
               {classState.bookTitle}
@@ -275,7 +298,7 @@ export default function App() {
                     value={loginUsername}
                     onChange={(e) => setLoginUsername(e.target.value)}
                     placeholder="Nhập tên đăng nhập hoặc Gmail..."
-                    className="w-full pl-10 pr-4 py-2.5 bg-slate-800/60 border border-slate-700/80 rounded-xl text-slate-200 placeholder-slate-500 text-sm focus:outline-none focus:border-cyan-500 transition"
+                    className="w-full pl-10 pr-4 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-slate-200 placeholder-slate-500 text-sm focus:outline-none focus:border-cyan-500 transition"
                   />
                 </div>
               </div>
@@ -294,7 +317,7 @@ export default function App() {
                     value={loginPassword}
                     onChange={(e) => setLoginPassword(e.target.value)}
                     placeholder="Nhập mật khẩu..."
-                    className="w-full pl-10 pr-10 py-2.5 bg-slate-800/60 border border-slate-700/80 rounded-xl text-slate-200 placeholder-slate-500 text-sm focus:outline-none focus:border-cyan-500 transition"
+                    className="w-full pl-10 pr-10 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-slate-200 placeholder-slate-500 text-sm focus:outline-none focus:border-cyan-500 transition"
                   />
                   <button
                     type="button"
@@ -314,7 +337,7 @@ export default function App() {
                 <span>Đăng nhập</span>
               </button>
 
-              <div className="pt-4 border-t border-slate-800/80 text-center">
+              <div className="pt-4 border-t border-slate-800 text-center">
                 <p className="text-xs text-slate-400">
                   Chưa có tài khoản giáo viên?{' '}
                   <button
@@ -346,7 +369,7 @@ export default function App() {
                     value={regForm.fullName}
                     onChange={(e) => setRegForm({...regForm, fullName: e.target.value})}
                     placeholder="Ví dụ: Thầy Hoàng Văn A"
-                    className="w-full px-3 py-2 bg-slate-800/60 border border-slate-700/80 rounded-xl text-slate-200 placeholder-slate-500 text-xs focus:outline-none focus:border-cyan-500"
+                    className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-slate-200 placeholder-slate-500 text-xs focus:outline-none focus:border-cyan-500"
                   />
                 </div>
 
@@ -360,7 +383,7 @@ export default function App() {
                     value={regForm.className}
                     onChange={(e) => setRegForm({...regForm, className: e.target.value})}
                     placeholder="Ví dụ: 10A1"
-                    className="w-full px-3 py-2 bg-slate-800/60 border border-slate-700/80 rounded-xl text-slate-200 placeholder-slate-500 text-xs focus:outline-none focus:border-cyan-500"
+                    className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-slate-200 placeholder-slate-500 text-xs focus:outline-none focus:border-cyan-500"
                   />
                 </div>
               </div>
@@ -376,7 +399,7 @@ export default function App() {
                     value={regForm.phone}
                     onChange={(e) => setRegForm({...regForm, phone: e.target.value})}
                     placeholder="09xx xxx xxx"
-                    className="w-full px-3 py-2 bg-slate-800/60 border border-slate-700/80 rounded-xl text-slate-200 placeholder-slate-500 text-xs focus:outline-none focus:border-cyan-500"
+                    className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-slate-200 placeholder-slate-500 text-xs focus:outline-none focus:border-cyan-500"
                   />
                 </div>
 
@@ -390,7 +413,7 @@ export default function App() {
                     value={regForm.email}
                     onChange={(e) => setRegForm({...regForm, email: e.target.value})}
                     placeholder="email@gmail.com"
-                    className="w-full px-3 py-2 bg-slate-800/60 border border-slate-700/80 rounded-xl text-slate-200 placeholder-slate-500 text-xs focus:outline-none focus:border-cyan-500"
+                    className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-slate-200 placeholder-slate-500 text-xs focus:outline-none focus:border-cyan-500"
                   />
                 </div>
               </div>
@@ -407,7 +430,7 @@ export default function App() {
                       value={regForm.password}
                       onChange={(e) => setRegForm({...regForm, password: e.target.value})}
                       placeholder="Mật khẩu"
-                      className="w-full pl-3 pr-8 py-2 bg-slate-800/60 border border-slate-700/80 rounded-xl text-slate-200 placeholder-slate-500 text-xs focus:outline-none focus:border-cyan-500"
+                      className="w-full pl-3 pr-8 py-2 bg-slate-800 border border-slate-700 rounded-xl text-slate-200 placeholder-slate-500 text-xs focus:outline-none focus:border-cyan-500"
                     />
                     <button
                       type="button"
@@ -430,7 +453,7 @@ export default function App() {
                       value={regForm.confirmPassword}
                       onChange={(e) => setRegForm({...regForm, confirmPassword: e.target.value})}
                       placeholder="Nhập lại"
-                      className="w-full pl-3 pr-8 py-2 bg-slate-800/60 border border-slate-700/80 rounded-xl text-slate-200 placeholder-slate-500 text-xs focus:outline-none focus:border-cyan-500"
+                      className="w-full pl-3 pr-8 py-2 bg-slate-800 border border-slate-700 rounded-xl text-slate-200 placeholder-slate-500 text-xs focus:outline-none focus:border-cyan-500"
                     />
                     <button
                       type="button"
@@ -465,11 +488,11 @@ export default function App() {
 
           {authView === 'otp_verify' && (
             <form onSubmit={handleVerifyOtp} className="space-y-4">
-              <div className="p-4 rounded-xl bg-slate-800/50 border border-slate-700/60 text-center">
+              <div className="p-4 rounded-xl bg-slate-800 border border-slate-700 text-center">
                 <Mail className="w-8 h-8 text-cyan-400 mx-auto mb-2" />
                 <p className="text-xs text-slate-300">Mã OTP 6 số đã được gửi đến Gmail:</p>
                 <p className="text-sm font-bold text-cyan-400 mt-0.5">{regForm.email}</p>
-                <div className="mt-3 p-2 bg-cyan-950/40 border border-cyan-500/30 rounded-lg text-left">
+                <div className="mt-3 p-2 bg-cyan-950/60 border border-cyan-500/30 rounded-lg text-left">
                   <span className="text-[11px] text-cyan-300 block font-mono">
                     [Mô phỏng Email Service]: Mã OTP của bạn là: <b className="text-white text-sm tracking-widest">{generatedOtp}</b>
                   </span>
@@ -487,7 +510,7 @@ export default function App() {
                   value={inputOtp}
                   onChange={(e) => setInputOtp(e.target.value)}
                   placeholder="------"
-                  className="w-full text-center tracking-[0.5em] text-lg font-mono py-2 bg-slate-800/60 border border-slate-700 rounded-xl text-white focus:outline-none focus:border-cyan-500"
+                  className="w-full text-center tracking-[0.5em] text-lg font-mono py-2 bg-slate-800 border border-slate-700 rounded-xl text-white focus:outline-none focus:border-cyan-500"
                 />
               </div>
 
@@ -511,21 +534,61 @@ export default function App() {
   }
 
   // ==========================================
-  // VIEW: MAIN PANEL
+  // VIEW: MAIN PANEL (CÓ ẨN / HIỆN SIDEBAR)
   // ==========================================
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex font-sans selection:bg-cyan-500 selection:text-white">
-      
-      {/* Sidebar cuộn linh hoạt với 19 danh mục */}
-      <aside className="w-72 bg-slate-900 border-r border-slate-800 flex flex-col justify-between shrink-0 h-screen sticky top-0">
+    <div 
+      className="min-h-screen text-slate-100 flex font-sans selection:bg-cyan-500 selection:text-white bg-cover bg-center bg-no-repeat bg-fixed relative overflow-x-hidden"
+      style={{ backgroundImage: `url('./bg-khaigiang.jpg')` }}
+    >
+      {/* 
+        CHÚ Ý: Ở Trang Chủ ('home') giữ ảnh nguyên bản 100% không làm tối.
+        Khi chuyển sang các tab nghiệp vụ khác mới phủ lớp nền tối để dễ đọc văn bản.
+      */}
+      {activeTab !== 'home' && (
+        <div className="fixed inset-0 bg-slate-950/80 pointer-events-none z-0" />
+      )}
+
+      {/* NÚT THU GỌN / MỞ RỘNG SIDEBAR [<] [>] */}
+      <button
+        onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+        title={isSidebarOpen ? "Ẩn danh mục [<]" : "Mở danh mục [>]"}
+        className={`fixed top-4 z-30 p-2 rounded-xl border border-slate-700 bg-slate-900/90 text-cyan-400 hover:bg-slate-800 transition-all duration-300 shadow-xl flex items-center gap-1.5 ${
+          isSidebarOpen ? 'left-[296px]' : 'left-4'
+        }`}
+      >
+        {isSidebarOpen ? (
+          <>
+            <ChevronLeft className="w-4 h-4" />
+            <span className="text-[11px] font-mono font-bold pr-1">[&lt;]</span>
+          </>
+        ) : (
+          <>
+            <ChevronRight className="w-4 h-4" />
+            <span className="text-[11px] font-mono font-bold pr-1">[&gt;]</span>
+          </>
+        )}
+      </button>
+
+      {/* SIDEBAR CÓ THỂ ẨN / HIỆN */}
+      <aside 
+        className={`w-72 bg-slate-900/95 border-r border-slate-800 flex flex-col justify-between shrink-0 h-screen sticky top-0 z-20 transition-all duration-300 ${
+          isSidebarOpen ? 'translate-x-0' : '-translate-x-full absolute'
+        }`}
+      >
         <div className="overflow-y-auto p-4 space-y-6">
           
+          {/* Logo trường góc trên bên trái Sidebar */}
           <div className="flex items-center gap-3 px-2">
-            <div className="w-9 h-9 bg-cyan-500/10 border border-cyan-500/30 rounded-lg flex items-center justify-center shrink-0">
-              <BookOpen className="w-5 h-5 text-cyan-400" />
-            </div>
+            <img 
+              src="./logo-phucu.png" 
+              alt="Logo Trường THPT Phù Cừ" 
+              className="w-10 h-10 object-contain drop-shadow"
+            />
             <div className="overflow-hidden">
-              <h2 className="font-bold text-xs text-white uppercase truncate">THPT Phù Cừ</h2>
+              <h2 className="font-bold text-xs text-white uppercase truncate">
+                TRƯỜNG THPT PHÙ CỪ
+              </h2>
               <span className="text-[10px] text-cyan-400 font-mono block">
                 {currentUser.role === 'developer' ? 'Root Debug' : `Lớp: ${classState.className}`}
               </span>
@@ -548,7 +611,7 @@ export default function App() {
                       className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium transition ${
                         isActive
                           ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/30 shadow-sm font-semibold'
-                          : 'text-slate-400 hover:bg-slate-800/80 hover:text-slate-200'
+                          : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
                       }`}
                     >
                       <span className={isActive ? 'text-cyan-400' : 'text-slate-500'}>
@@ -561,7 +624,6 @@ export default function App() {
               </div>
             ))}
 
-            {/* Dev Console ẩn danh */}
             {currentUser.role === 'developer' && (
               <div className="space-y-1 pt-2 border-t border-slate-800">
                 <p className="px-2.5 text-[10px] font-bold text-amber-500 tracking-wider uppercase">
@@ -585,7 +647,7 @@ export default function App() {
         </div>
 
         {/* User profile footer */}
-        <div className="p-4 border-t border-slate-800 bg-slate-900/60">
+        <div className="p-4 border-t border-slate-800 bg-slate-900">
           <div className="flex items-center gap-2.5 mb-2.5 px-1">
             <div className="w-8 h-8 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-xs font-bold text-cyan-400 shrink-0">
               {currentUser.fullName ? currentUser.fullName[0].toUpperCase() : 'GV'}
@@ -605,11 +667,88 @@ export default function App() {
       </aside>
 
       {/* Main Content View */}
-      <main className="flex-1 p-8 overflow-y-auto">
+      <main className="flex-1 p-8 overflow-y-auto relative z-10">
 
-        {/* 1. BÀN LÀM VIỆC TỔNG QUAN */}
+        {/* ========================================================================= */}
+        {/* TAB TRANG CHỦ: CHỈ CÓ ẢNH TRƯỜNG VÀ CÁC PLACEHOLDER HOÀN TOÀN TRONG SUỐT */}
+        {/* ========================================================================= */}
+        {activeTab === 'home' && (
+          <div className="max-w-5xl space-y-6 pt-12 md:pt-4">
+            
+            {/* Header Trong Suốt Hoàn Toàn (Chỉ viền mờ và đổ bóng chữ) */}
+            <header className="p-6 rounded-2xl bg-transparent border border-white/20 backdrop-blur-[2px]">
+              <span className="text-xs font-bold text-cyan-300 uppercase tracking-widest block mb-1 drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)]">
+                {classState.schoolName}
+              </span>
+              <h1 className="text-2xl md:text-3xl font-extrabold text-white tracking-tight drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)]">
+                {classState.bookTitle}
+              </h1>
+              <p className="text-sm text-slate-200 mt-2 drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)]">
+                Chào mừng Thầy/Cô <b className="text-cyan-300">{classState.teacherName || currentUser.fullName}</b> đến với cổng thông tin điện tử lớp <b className="text-amber-300">{classState.className}</b>.
+              </p>
+            </header>
+
+            {/* Các Card Placeholder Trong Suốt (bg-transparent) */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+              <div className="p-5 rounded-2xl bg-transparent border border-white/20 backdrop-blur-[2px] transition hover:border-cyan-400/50">
+                <div className="flex items-center justify-between text-slate-200 mb-2">
+                  <span className="text-xs font-bold uppercase tracking-wider drop-shadow">HỆ THỐNG SỔ</span>
+                  <BookOpen className="w-5 h-5 text-cyan-300 drop-shadow" />
+                </div>
+                <div className="text-lg font-bold text-white drop-shadow">Chủ Nhiệm Điện Tử</div>
+                <p className="text-xs text-slate-300 mt-1 drop-shadow">
+                  Tích hợp 19 phân hệ chuẩn hoá theo quy chế THPT
+                </p>
+              </div>
+
+              <div className="p-5 rounded-2xl bg-transparent border border-white/20 backdrop-blur-[2px] transition hover:border-cyan-400/50">
+                <div className="flex items-center justify-between text-slate-200 mb-2">
+                  <span className="text-xs font-bold uppercase tracking-wider drop-shadow">ĐÁNH GIÁ THPT</span>
+                  <Award className="w-5 h-5 text-amber-300 drop-shadow" />
+                </div>
+                <div className="text-lg font-bold text-white drop-shadow">Thông Tư 22/2021</div>
+                <p className="text-xs text-slate-300 mt-1 drop-shadow">
+                  Tra cứu quy chuẩn đánh giá học lực & hạnh kiểm
+                </p>
+              </div>
+
+              <div className="p-5 rounded-2xl bg-transparent border border-white/20 backdrop-blur-[2px] transition hover:border-cyan-400/50">
+                <div className="flex items-center justify-between text-slate-200 mb-2">
+                  <span className="text-xs font-bold uppercase tracking-wider drop-shadow">NĂM HỌC HIỆN TẠI</span>
+                  <Compass className="w-5 h-5 text-emerald-300 drop-shadow" />
+                </div>
+                <div className="text-lg font-bold text-white drop-shadow">2026 - 2027</div>
+                <p className="text-xs text-slate-300 mt-1 drop-shadow">
+                  Sẵn sàng đồng bộ hồ sơ lớp học trực tuyến
+                </p>
+              </div>
+            </div>
+
+            {/* Placeholder bảng tin nhanh trong suốt */}
+            <div className="p-6 rounded-2xl bg-transparent border border-white/20 backdrop-blur-[2px] flex items-center justify-between">
+              <div>
+                <h3 className="text-base font-bold text-white drop-shadow">Bắt đầu quản lý lớp học ngay</h3>
+                <p className="text-xs text-slate-300 mt-0.5 drop-shadow">
+                  Nhấn vào Bàn làm việc để quản lý danh sách học sinh và điểm danh
+                </p>
+              </div>
+              <button
+                onClick={() => setActiveTab('dashboard')}
+                className="px-4 py-2 rounded-xl bg-cyan-500/80 hover:bg-cyan-400 text-slate-950 font-bold text-xs flex items-center gap-2 transition shadow-lg"
+              >
+                <span>Mở Bàn làm việc</span>
+                <ArrowRight className="w-4 h-4" />
+              </button>
+            </div>
+
+          </div>
+        )}
+
+        {/* ========================================================================= */}
+        {/* TAB BÀN LÀM VIỆC (RIÊNG BIỆT VỚI TRANG CHỦ) */}
+        {/* ========================================================================= */}
         {activeTab === 'dashboard' && (
-          <div className="max-w-5xl space-y-6">
+          <div className="max-w-5xl space-y-6 pt-12 md:pt-0">
             <header className="bg-slate-900 border border-slate-800 p-6 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div>
                 <span className="text-[11px] font-bold text-cyan-400 uppercase tracking-widest block mb-1">
@@ -631,7 +770,7 @@ export default function App() {
             </header>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="bg-slate-900/60 border border-slate-800 p-5 rounded-2xl">
+              <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl">
                 <div className="flex items-center justify-between text-slate-400 mb-2">
                   <span className="text-xs font-semibold">SĨ SỐ HỌC SINH</span>
                   <Users className="w-4 h-4 text-cyan-400" />
@@ -642,7 +781,7 @@ export default function App() {
                 </div>
               </div>
 
-              <div className="bg-slate-900/60 border border-slate-800 p-5 rounded-2xl">
+              <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl">
                 <div className="flex items-center justify-between text-slate-400 mb-2">
                   <span className="text-xs font-semibold">ĐIỂM THI ĐUA GỐC</span>
                   <Award className="w-4 h-4 text-amber-400" />
@@ -652,7 +791,7 @@ export default function App() {
               </div>
             </div>
 
-            <div className="p-6 bg-slate-900/40 border border-slate-800/80 rounded-2xl">
+            <div className="p-6 bg-slate-900 border border-slate-800 rounded-2xl">
               <div className="flex items-center justify-between mb-4">
                 <div>
                   <h3 className="text-sm font-bold text-white">Danh sách học sinh lớp {classState.className}</h3>
@@ -678,7 +817,7 @@ export default function App() {
               </div>
 
               {classState.studentsList.length === 0 ? (
-                <div className="py-12 text-center border border-dashed border-slate-800 rounded-xl bg-slate-900/20">
+                <div className="py-12 text-center border border-dashed border-slate-800 rounded-xl bg-slate-950/40">
                   <Users className="w-10 h-10 text-slate-600 mx-auto mb-3" />
                   <p className="text-sm font-semibold text-slate-300">Lớp học hiện chưa có học sinh nào</p>
                   <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
@@ -688,7 +827,7 @@ export default function App() {
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-xs text-slate-300">
-                    <thead className="bg-slate-800/60 text-slate-400 uppercase tracking-wider text-[10px]">
+                    <thead className="bg-slate-800 text-slate-400 uppercase tracking-wider text-[10px]">
                       <tr>
                         <th className="py-2.5 px-4 rounded-l-lg">STT</th>
                         <th className="py-2.5 px-4">Họ và Tên</th>
@@ -697,7 +836,7 @@ export default function App() {
                     </thead>
                     <tbody className="divide-y divide-slate-800">
                       {classState.studentsList.map((st, idx) => (
-                        <tr key={st.id} className="hover:bg-slate-800/30">
+                        <tr key={st.id} className="hover:bg-slate-800/40">
                           <td className="py-2.5 px-4 font-mono text-slate-500">{idx + 1}</td>
                           <td className="py-2.5 px-4 font-medium text-white">{st.name}</td>
                           <td className="py-2.5 px-4 text-right">
@@ -725,9 +864,9 @@ export default function App() {
           </div>
         )}
 
-        {/* 2. THÔNG TƯ 22/2021 IFRAME */}
+        {/* THÔNG TƯ 22/2021 IFRAME */}
         {activeTab === 'regulation' && (
-          <div className="max-w-6xl space-y-4">
+          <div className="max-w-6xl space-y-4 pt-12 md:pt-0">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-900 border border-slate-800 p-4 rounded-2xl">
               <div>
                 <h2 className="text-sm font-bold text-white flex items-center gap-2">
@@ -760,11 +899,11 @@ export default function App() {
           </div>
         )}
 
-        {/* 3. SƠ YẾU LÝ LỊCH HỌC SINH */}
+        {/* SƠ YẾU LÝ LỊCH HỌC SINH */}
         {activeTab === 'student_profile' && (
           <ModulePreviewContainer title="SƠ YẾU LÝ LỊCH HỌC SINH" desc="Quản lý thông tin cá nhân, ngày sinh, dân tộc, nơi ở và thông tin phụ huynh">
             <table className="w-full text-left text-xs text-slate-300">
-              <thead className="bg-slate-800/60 text-slate-400 uppercase text-[10px]">
+              <thead className="bg-slate-800 text-slate-400 uppercase text-[10px]">
                 <tr>
                   <th className="p-3">STT</th>
                   <th className="p-3">Họ và tên</th>
@@ -784,11 +923,11 @@ export default function App() {
           </ModulePreviewContainer>
         )}
 
-        {/* 4. BAN ĐẠI DIỆN CHA MẸ HỌC SINH */}
+        {/* BAN ĐẠI DIỆN CHA MẸ HỌC SINH */}
         {activeTab === 'parent_committee' && (
-          <ModulePreviewContainer title="BAN ĐẠI DIỆN HỘI CHA MẸ HỌC SINH" desc="Danh sách Ban đại diện PHHS lớp năm học 2026 - 2027">
+          <ModulePreviewContainer title="DANH SÁCH BAN ĐẠI DIỆN HỘI CHA MẸ HỌC SINH" desc="Danh sách Ban đại diện PHHS lớp năm học 2026 - 2027">
             <table className="w-full text-left text-xs text-slate-300">
-              <thead className="bg-slate-800/60 text-slate-400 uppercase text-[10px]">
+              <thead className="bg-slate-800 text-slate-400 uppercase text-[10px]">
                 <tr>
                   <th className="p-3">STT</th>
                   <th className="p-3">Họ và tên phụ huynh</th>
@@ -807,11 +946,11 @@ export default function App() {
           </ModulePreviewContainer>
         )}
 
-        {/* 5. CÁN BỘ LỚP CÁN BỘ ĐOÀN */}
+        {/* CÁN BỘ LỚP CÁN BỘ ĐOÀN */}
         {activeTab === 'class_leaders' && (
-          <ModulePreviewContainer title="DANH SÁCH CÁN BỘ LỚP - CÁN BỘ ĐOÀN" desc="Ban cán sự lớp và Ban chấp hành Chi đoàn nhiệm kỳ mới">
+          <ModulePreviewContainer title="DANH SÁCH CÁN BỘ LỚP CÁN BỘ ĐOÀN" desc="Ban cán sự lớp và Ban chấp hành Chi đoàn nhiệm kỳ mới">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="bg-slate-950/40 p-4 rounded-xl border border-slate-800">
+              <div className="bg-slate-950 p-4 rounded-xl border border-slate-800">
                 <h4 className="text-xs font-bold text-cyan-400 uppercase mb-3">Ban cán sự lớp</h4>
                 <div className="space-y-2 text-xs text-slate-400">
                   <div className="flex justify-between py-1.5 border-b border-slate-800"><span>Lớp trưởng:</span> <b className="text-slate-300">[Chưa phân công]</b></div>
@@ -820,7 +959,7 @@ export default function App() {
                   <div className="flex justify-between py-1.5"><span>Lớp phó Phong trào:</span> <b className="text-slate-300">[Chưa phân công]</b></div>
                 </div>
               </div>
-              <div className="bg-slate-950/40 p-4 rounded-xl border border-slate-800">
+              <div className="bg-slate-950 p-4 rounded-xl border border-slate-800">
                 <h4 className="text-xs font-bold text-amber-400 uppercase mb-3">Ban chấp hành Chi đoàn</h4>
                 <div className="space-y-2 text-xs text-slate-400">
                   <div className="flex justify-between py-1.5 border-b border-slate-800"><span>Bí thư Chi đoàn:</span> <b className="text-slate-300">[Chưa phân công]</b></div>
@@ -832,12 +971,12 @@ export default function App() {
           </ModulePreviewContainer>
         )}
 
-        {/* 6. DANH SÁCH CHIA THEO TỔ */}
+        {/* DANH SÁCH CHIA THEO TỔ */}
         {activeTab === 'team_groups' && (
-          <ModulePreviewContainer title="DANH SÁCH HỌC SINH CHIA THEO TỔ" desc="Phân chia 4 tổ thi đua học tập và trực nhật">
+          <ModulePreviewContainer title="DANH SÁCH HS CHIA THEO TỔ" desc="Phân chia 4 tổ thi đua học tập và trực nhật">
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               {[1, 2, 3, 4].map(t => (
-                <div key={t} className="bg-slate-950/40 p-4 rounded-xl border border-slate-800">
+                <div key={t} className="bg-slate-950 p-4 rounded-xl border border-slate-800">
                   <h4 className="text-xs font-bold text-white uppercase mb-2">Tổ {t}</h4>
                   <p className="text-[11px] text-slate-500 mb-3">Tổ trưởng: [Chưa chọn]</p>
                   <div className="py-8 text-center text-xs text-slate-600 border border-dashed border-slate-800 rounded-lg">
@@ -849,10 +988,10 @@ export default function App() {
           </ModulePreviewContainer>
         )}
 
-        {/* 7. SƠ ĐỒ LỚP */}
+        {/* SƠ ĐỒ LỚP */}
         {activeTab === 'seating_chart' && (
-          <ModulePreviewContainer title="SƠ ĐỒ LỚP HỌC" desc="Bố trí vị trí bàn ghế và chỗ ngồi học sinh theo dãy">
-            <div className="w-full bg-slate-950/50 p-6 rounded-xl border border-slate-800 text-center space-y-8">
+          <ModulePreviewContainer title="SƠ ĐỒ LỚP" desc="Bố trí vị trí bàn ghế và chỗ ngồi học sinh theo dãy">
+            <div className="w-full bg-slate-950 p-6 rounded-xl border border-slate-800 text-center space-y-8">
               <div className="py-2.5 px-8 bg-slate-800 text-slate-300 text-xs font-bold rounded-lg inline-block border border-slate-700">
                 BẢNG VIẾT LỚP HỌC & BÀN GIÁO VIÊN
               </div>
@@ -872,12 +1011,12 @@ export default function App() {
           </ModulePreviewContainer>
         )}
 
-        {/* 8. THỜI KHOÁ BIỂU CHÍNH KHOÁ */}
+        {/* THỜI KHOÁ BIỂU CHÍNH KHOÁ */}
         {activeTab === 'schedule_main' && (
           <ModulePreviewContainer title="THỜI KHOÁ BIỂU CHÍNH KHOÁ" desc="Lịch học các tiết buổi sáng từ Thứ Hai đến Thứ Bảy">
             <div className="overflow-x-auto">
               <table className="w-full text-center text-xs text-slate-300">
-                <thead className="bg-slate-800/60 text-slate-400 uppercase text-[10px]">
+                <thead className="bg-slate-800 text-slate-400 uppercase text-[10px]">
                   <tr>
                     <th className="p-3 text-left">Tiết</th>
                     <th className="p-3">Thứ 2</th>
@@ -890,7 +1029,7 @@ export default function App() {
                 </thead>
                 <tbody className="divide-y divide-slate-800">
                   {[1, 2, 3, 4, 5].map(p => (
-                    <tr key={p} className="hover:bg-slate-800/20">
+                    <tr key={p} className="hover:bg-slate-800/40">
                       <td className="p-3 text-left font-bold text-slate-500">Tiết {p}</td>
                       <td className="p-3 text-slate-600">-</td>
                       <td className="p-3 text-slate-600">-</td>
@@ -906,12 +1045,12 @@ export default function App() {
           </ModulePreviewContainer>
         )}
 
-        {/* 9. THỜI KHOÁ BIỂU BUỔI 2 */}
+        {/* THỜI KHOÁ BIỂU BUỔI 2 */}
         {activeTab === 'schedule_extra' && (
-          <ModulePreviewContainer title="THỜI KHOÁ BIỂU BUỔI 2 (TĂNG CƯỜNG / TRẢI NGHIỆM)" desc="Lịch học phụ đạo, tăng tiết và hoạt động giáo dục buổi chiều">
+          <ModulePreviewContainer title="THỜI KHOÁ BIỂU BUỔI 2" desc="Lịch học phụ đạo, tăng tiết và hoạt động giáo dục buổi chiều">
             <div className="overflow-x-auto">
               <table className="w-full text-center text-xs text-slate-300">
-                <thead className="bg-slate-800/60 text-slate-400 uppercase text-[10px]">
+                <thead className="bg-slate-800 text-slate-400 uppercase text-[10px]">
                   <tr>
                     <th className="p-3 text-left">Tiết chiều</th>
                     <th className="p-3">Thứ 2</th>
@@ -923,7 +1062,7 @@ export default function App() {
                 </thead>
                 <tbody className="divide-y divide-slate-800">
                   {[1, 2, 3].map(p => (
-                    <tr key={p} className="hover:bg-slate-800/20">
+                    <tr key={p} className="hover:bg-slate-800/40">
                       <td className="p-3 text-left font-bold text-slate-500">Tiết {p}</td>
                       <td className="p-3 text-slate-600">-</td>
                       <td className="p-3 text-slate-600">-</td>
@@ -938,11 +1077,11 @@ export default function App() {
           </ModulePreviewContainer>
         )}
 
-        {/* 10. GIÁO DỤC HỌC SINH CÁ BIỆT */}
+        {/* GIÁO DỤC HS CÁ BIỆT */}
         {activeTab === 'special_education' && (
-          <ModulePreviewContainer title="KẾ HOẠCH & BIỆN PHÁP GIÁO DỤC HỌC SINH CÁ BIỆT" desc="Theo dõi, uốn nắn và phối hợp phụ huynh với học sinh cần hỗ trợ đặc biệt">
+          <ModulePreviewContainer title="GIÁO DỤC HS CÁ BIỆT" desc="Theo dõi, uốn nắn và phối hợp phụ huynh với học sinh cần hỗ trợ đặc biệt">
             <table className="w-full text-left text-xs text-slate-300">
-              <thead className="bg-slate-800/60 text-slate-400 uppercase text-[10px]">
+              <thead className="bg-slate-800 text-slate-400 uppercase text-[10px]">
                 <tr>
                   <th className="p-3">STT</th>
                   <th className="p-3">Họ và tên học sinh</th>
@@ -961,15 +1100,15 @@ export default function App() {
           </ModulePreviewContainer>
         )}
 
-        {/* 11. KẾ HOẠCH CÔNG TÁC CHỦ NHIỆM */}
+        {/* KẾ HOẠCH CÔNG TÁC CHỦ NHIỆM */}
         {activeTab === 'annual_plan' && (
-          <ModulePreviewContainer title="KẾ HOẠCH CÔNG TÁC CHỦ NHIỆM NĂM HỌC 2026 - 2027" desc="Đặc điểm tình hình, mục tiêu phấn đấu, các chỉ tiêu học lực và hạnh kiểm cả năm">
+          <ModulePreviewContainer title="KẾ HOẠCH CÔNG TÁC CHỦ NHIỆM" desc="Đặc điểm tình hình, mục tiêu phấn đấu, các chỉ tiêu học lực và hạnh kiểm cả năm">
             <div className="space-y-4 text-xs text-slate-300">
-              <div className="p-4 bg-slate-950/40 rounded-xl border border-slate-800 space-y-2">
+              <div className="p-4 bg-slate-950 rounded-xl border border-slate-800 space-y-2">
                 <h4 className="font-bold text-white uppercase text-xs">1. Thuận lợi và khó khăn</h4>
                 <p className="text-slate-500 italic">[Chưa nhập nội dung phân tích đặc điểm đầu năm]</p>
               </div>
-              <div className="p-4 bg-slate-950/40 rounded-xl border border-slate-800 space-y-2">
+              <div className="p-4 bg-slate-950 rounded-xl border border-slate-800 space-y-2">
                 <h4 className="font-bold text-white uppercase text-xs">2. Mục tiêu và chỉ tiêu phấn đấu</h4>
                 <p className="text-slate-500 italic">[Chưa nhập chỉ tiêu xếp loại hạnh kiểm, học lực theo Thông tư 22]</p>
               </div>
@@ -977,12 +1116,12 @@ export default function App() {
           </ModulePreviewContainer>
         )}
 
-        {/* 12. CÔNG TÁC THÁNG */}
+        {/* CÔNG TÁC THÁNG */}
         {activeTab === 'monthly_plan' && (
-          <ModulePreviewContainer title="KẾ HOẠCH CÔNG TÁC THEO TỪNG THÁNG" desc="Trọng tâm công tác từ Tháng 9 đến Tháng 5 trong năm học">
+          <ModulePreviewContainer title="CÔNG TÁC THÁNG" desc="Trọng tâm công tác từ Tháng 9 đến Tháng 5 trong năm học">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {[9, 10, 11, 12, 1, 2, 3, 4, 5].map(m => (
-                <div key={m} className="p-4 bg-slate-950/40 rounded-xl border border-slate-800 space-y-2">
+                <div key={m} className="p-4 bg-slate-950 rounded-xl border border-slate-800 space-y-2">
                   <h4 className="font-bold text-cyan-400 text-xs uppercase">Tháng {m}</h4>
                   <p className="text-[11px] text-slate-500">[Chưa cập nhật nội dung trọng tâm tháng]</p>
                 </div>
@@ -991,11 +1130,11 @@ export default function App() {
           </ModulePreviewContainer>
         )}
 
-        {/* 13. NỘI DUNG SINH HOẠT LỚP */}
+        {/* NỘI DUNG SINH HOẠT LỚP */}
         {activeTab === 'class_meeting' && (
-          <ModulePreviewContainer title="NỘI DUNG & BIÊN BẢN SINH HOẠT LỚP HÀNG TUẦN" desc="Đánh giá nề nếp tuần, khen thưởng tổ xuất sắc và kế hoạch tuần tới">
+          <ModulePreviewContainer title="NỘI DUNG SINH HOẠT LỚP" desc="Đánh giá nề nếp tuần, khen thưởng tổ xuất sắc và kế hoạch tuần tới">
             <table className="w-full text-left text-xs text-slate-300">
-              <thead className="bg-slate-800/60 text-slate-400 uppercase text-[10px]">
+              <thead className="bg-slate-800 text-slate-400 uppercase text-[10px]">
                 <tr>
                   <th className="p-3">Tuần</th>
                   <th className="p-3">Ngày sinh hoạt</th>
@@ -1014,11 +1153,11 @@ export default function App() {
           </ModulePreviewContainer>
         )}
 
-        {/* 14. THEO DÕI HỌC TẬP VÀ RÈN LUYỆN */}
+        {/* THEO DÕI TÌNH HÌNH HỌC TẬP VÀ RÈN LUYỆN CỦA HS */}
         {activeTab === 'study_tracking' && (
-          <ModulePreviewContainer title="THEO DÕI TÌNH HÌNH HỌC TẬP VÀ RÈN LUYỆN CỦA HỌC SINH" desc="Ghi chép điểm số, vi phạm nề nếp và các biểu hiện tích cực hàng ngày">
+          <ModulePreviewContainer title="THEO DÕI TÌNH HÌNH HỌC TẬP VÀ RÈN LUYỆN CỦA HS" desc="Ghi chép điểm số, vi phạm nề nếp và các biểu hiện tích cực hàng ngày">
             <table className="w-full text-left text-xs text-slate-300">
-              <thead className="bg-slate-800/60 text-slate-400 uppercase text-[10px]">
+              <thead className="bg-slate-800 text-slate-400 uppercase text-[10px]">
                 <tr>
                   <th className="p-3">Ngày</th>
                   <th className="p-3">Họ tên HS</th>
@@ -1037,11 +1176,11 @@ export default function App() {
           </ModulePreviewContainer>
         )}
 
-        {/* 15. TỔNG HỢP KẾT QUẢ ĐÁNH GIÁ XẾP LOẠI */}
+        {/* TỔNG HỢP KẾT QUẢ ĐÁNH GIÁ XẾP LOẠI HS */}
         {activeTab === 'evaluation_summary' && (
-          <ModulePreviewContainer title="TỔNG HỢP KẾT QUẢ ĐÁNH GIÁ XẾP LOẠI HỌC SINH (THEO TT 22)" desc="Bảng tổng hợp xếp loại Rèn luyện (Hạnh kiểm) và Học tập (Học lực) cuối kỳ">
+          <ModulePreviewContainer title="TỔNG HỢP KẾT QUẢ ĐÁNH GIÁ XẾP LOẠI HS" desc="Bảng tổng hợp xếp loại Rèn luyện (Hạnh kiểm) và Học tập (Học lực) cuối kỳ">
             <table className="w-full text-left text-xs text-slate-300">
-              <thead className="bg-slate-800/60 text-slate-400 uppercase text-[10px]">
+              <thead className="bg-slate-800 text-slate-400 uppercase text-[10px]">
                 <tr>
                   <th className="p-3">STT</th>
                   <th className="p-3">Họ và tên</th>
@@ -1061,11 +1200,11 @@ export default function App() {
           </ModulePreviewContainer>
         )}
 
-        {/* 16. XẾP LOẠI THI ĐUA CỦA LỚP */}
+        {/* XẾP LOẠI THI ĐUA CỦA LỚP */}
         {activeTab === 'emulation_rank' && (
-          <ModulePreviewContainer title="BẢNG XẾP LOẠI THI ĐUA CỦA LỚP VỚI ĐOÀN TRƯỜNG" desc="Điểm thi đua Đoàn trường chấm hàng tuần và xếp hạng toàn trường">
+          <ModulePreviewContainer title="XẾP LOẠI THI ĐUA CỦA LỚP" desc="Điểm thi đua Đoàn trường chấm hàng tuần và xếp hạng toàn trường">
             <table className="w-full text-left text-xs text-slate-300">
-              <thead className="bg-slate-800/60 text-slate-400 uppercase text-[10px]">
+              <thead className="bg-slate-800 text-slate-400 uppercase text-[10px]">
                 <tr>
                   <th className="p-3">Tuần</th>
                   <th className="p-3">Điểm thi đua</th>
@@ -1084,11 +1223,11 @@ export default function App() {
           </ModulePreviewContainer>
         )}
 
-        {/* 17. HỌC SINH RÈN LUYỆN HÈ / KHÔNG ĐƯỢC LÊN LỚP */}
+        {/* DANH SÁCH HỌC SINH KHÔNG ĐƯỢC LÊN LỚP, KIỂM TRA LẠI HOẶC RÈN LUYỆN TRONG HÈ */}
         {activeTab === 'summer_retake' && (
           <ModulePreviewContainer title="DANH SÁCH HỌC SINH KHÔNG ĐƯỢC LÊN LỚP, KIỂM TRA LẠI HOẶC RÈN LUYỆN TRONG HÈ" desc="Tổng kết các trường hợp cần rèn luyện bổ sung sau năm học">
             <table className="w-full text-left text-xs text-slate-300">
-              <thead className="bg-slate-800/60 text-slate-400 uppercase text-[10px]">
+              <thead className="bg-slate-800 text-slate-400 uppercase text-[10px]">
                 <tr>
                   <th className="p-3">STT</th>
                   <th className="p-3">Họ và tên</th>
@@ -1107,19 +1246,19 @@ export default function App() {
           </ModulePreviewContainer>
         )}
 
-        {/* 18. NỘI DUNG CUỘC HỌP PHHS VÀ HỌP GVCN */}
+        {/* NỘI DUNG CUỘC HỌP VỚI CHA MẸ HỌC SINH VÀ HỌP GVCN CỦA TRƯỜNG */}
         {activeTab === 'meeting_minutes' && (
           <ModulePreviewContainer title="NỘI DUNG CUỘC HỌP VỚI CHA MẸ HỌC SINH VÀ HỌP GVCN CỦA TRƯỜNG" desc="Ghi chép các kết luận trong phiên họp BGH và các kỳ họp Cha mẹ học sinh">
             <div className="space-y-4 text-xs text-slate-300">
-              <div className="p-4 bg-slate-950/40 rounded-xl border border-slate-800">
+              <div className="p-4 bg-slate-950 rounded-xl border border-slate-800">
                 <h4 className="font-bold text-white mb-1 uppercase">1. Họp PHHS Đầu năm học (Tháng 9)</h4>
                 <p className="text-slate-500 italic">[Chưa ghi chép biên bản cuộc họp]</p>
               </div>
-              <div className="p-4 bg-slate-950/40 rounded-xl border border-slate-800">
+              <div className="p-4 bg-slate-950 rounded-xl border border-slate-800">
                 <h4 className="font-bold text-white mb-1 uppercase">2. Họp PHHS Sơ kết Học kỳ I (Tháng 1)</h4>
                 <p className="text-slate-500 italic">[Chưa ghi chép biên bản cuộc họp]</p>
               </div>
-              <div className="p-4 bg-slate-950/40 rounded-xl border border-slate-800">
+              <div className="p-4 bg-slate-950 rounded-xl border border-slate-800">
                 <h4 className="font-bold text-white mb-1 uppercase">3. Họp PHHS Tổng kết Năm học (Tháng 5)</h4>
                 <p className="text-slate-500 italic">[Chưa ghi chép biên bản cuộc họp]</p>
               </div>
@@ -1127,10 +1266,10 @@ export default function App() {
           </ModulePreviewContainer>
         )}
 
-        {/* 19. BÀN GIAO NGHỈ TẾT */}
+        {/* BIÊN BẢN BÀN GIAO HS VỀ NGHỈ TẾT NGUYÊN ĐÁN TẠI GIA ĐÌNH VÀ ĐỊA PHƯƠNG */}
         {activeTab === 'handover_tet' && (
-          <ModulePreviewContainer title="BIÊN BẢN BÀN GIAO HỌC SINH VỀ NGHỈ TẾT NGUYÊN ĐÁN TẠI GIA ĐÌNH VÀ ĐỊA PHƯƠNG" desc="Bàn giao nề nếp, cam kết an toàn giao thông và pháo nổ dịp Tết Nguyên Đán">
-            <div className="p-5 bg-slate-950/40 rounded-xl border border-slate-800 text-xs text-slate-300 space-y-3 leading-relaxed">
+          <ModulePreviewContainer title="BIÊN BẢN BÀN GIAO HS VỀ NGHỈ TẾT NGUYÊN ĐÁN TẠI GIA ĐÌNH VÀ ĐỊA PHƯƠNG" desc="Bàn giao nề nếp, cam kết an toàn giao thông và pháo nổ dịp Tết Nguyên Đán">
+            <div className="p-5 bg-slate-950 rounded-xl border border-slate-800 text-xs text-slate-300 space-y-3 leading-relaxed">
               <div className="flex justify-between border-b border-slate-800 pb-2">
                 <span>Thời gian bàn giao: <b>[Chưa thiết lập]</b></span>
                 <span>Tổng số học sinh bàn giao: <b>{classState.totalStudents} em</b></span>
@@ -1150,10 +1289,10 @@ export default function App() {
           </ModulePreviewContainer>
         )}
 
-        {/* 20. BÀN GIAO SINH HOẠT HÈ */}
+        {/* BIÊN BẢN BÀN GIAO HS VỀ SINH HOẠT HÈ TẠI GIA ĐÌNH VÀ ĐỊA PHƯƠNG */}
         {activeTab === 'handover_summer' && (
-          <ModulePreviewContainer title="BIÊN BẢN BÀN GIAO HỌC SINH VỀ SINH HOẠT HÈ TẠI GIA ĐÌNH VÀ ĐỊA PHƯƠNG" desc="Bàn giao học sinh về Đoàn xã / Đoàn thị trấn sinh hoạt trong kỳ nghỉ hè">
-            <div className="p-5 bg-slate-950/40 rounded-xl border border-slate-800 text-xs text-slate-300 space-y-3 leading-relaxed">
+          <ModulePreviewContainer title="BIÊN BẢN BÀN GIAO HS VỀ SINH HOẠT HÈ TẠI GIA ĐÌNH VÀ ĐỊA PHƯƠNG" desc="Bàn giao học sinh về Đoàn xã / Đoàn thị trấn sinh hoạt trong kỳ nghỉ hè">
+            <div className="p-5 bg-slate-950 rounded-xl border border-slate-800 text-xs text-slate-300 space-y-3 leading-relaxed">
               <div className="flex justify-between border-b border-slate-800 pb-2">
                 <span>Thời gian bàn giao hè: <b>[Tháng 5/2027]</b></span>
                 <span>Sĩ số bàn giao: <b>{classState.totalStudents} em</b></span>
@@ -1173,11 +1312,11 @@ export default function App() {
           </ModulePreviewContainer>
         )}
 
-        {/* 21. BGH KIỂM TRA NHẬN XÉT SỔ */}
+        {/* KIỂM TRA VÀ NHẬN XÉT CUỐI HỌC KỲ, CUỐI NĂM CỦA BGH VỀ SỬ DỤNG SỔ CÔNG TÁC CHỦ NHIỆM */}
         {activeTab === 'admin_inspection' && (
           <ModulePreviewContainer title="KIỂM TRA VÀ NHẬN XÉT CUỐI HỌC KỲ, CUỐI NĂM CỦA BGH VỀ SỬ DỤNG SỔ CÔNG TÁC CHỦ NHIỆM" desc="Ý kiến chỉ đạo, nhận xét phê duyệt hồ sơ từ Ban Giám Hiệu">
             <table className="w-full text-left text-xs text-slate-300">
-              <thead className="bg-slate-800/60 text-slate-400 uppercase text-[10px]">
+              <thead className="bg-slate-800 text-slate-400 uppercase text-[10px]">
                 <tr>
                   <th className="p-3">Đợt kiểm tra</th>
                   <th className="p-3">Ngày duyệt</th>
@@ -1187,21 +1326,21 @@ export default function App() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800">
-                <tr className="hover:bg-slate-800/20">
+                <tr className="hover:bg-slate-800/40">
                   <td className="p-3 font-semibold text-white">Cuối Tháng 10 (Giữa HK I)</td>
                   <td className="p-3 text-slate-500">-</td>
                   <td className="p-3 text-slate-500">[Chưa kiểm tra]</td>
                   <td className="p-3 text-slate-500">-</td>
                   <td className="p-3 text-slate-500">-</td>
                 </tr>
-                <tr className="hover:bg-slate-800/20">
+                <tr className="hover:bg-slate-800/40">
                   <td className="p-3 font-semibold text-white">Sơ kết Học kỳ I</td>
                   <td className="p-3 text-slate-500">-</td>
                   <td className="p-3 text-slate-500">[Chưa kiểm tra]</td>
                   <td className="p-3 text-slate-500">-</td>
                   <td className="p-3 text-slate-500">-</td>
                 </tr>
-                <tr className="hover:bg-slate-800/20">
+                <tr className="hover:bg-slate-800/40">
                   <td className="p-3 font-semibold text-white">Tổng kết Cuối năm học</td>
                   <td className="p-3 text-slate-500">-</td>
                   <td className="p-3 text-slate-500">[Chưa kiểm tra]</td>
@@ -1215,13 +1354,13 @@ export default function App() {
 
         {/* DEV PANEL */}
         {activeTab === 'dev_panel' && currentUser.role === 'developer' && (
-          <div className="max-w-5xl space-y-6">
+          <div className="max-w-5xl space-y-6 pt-12 md:pt-0">
             <header className="bg-amber-500/10 border border-amber-500/20 p-5 rounded-2xl flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <Terminal className="w-6 h-6 text-amber-400" />
                 <div>
                   <h1 className="text-base font-bold text-white">Developer Debug Console</h1>
-                  <p className="text-xs text-amber-400/80">Can thiệp State & Quản lý danh sách tài khoản trường THPT Phù Cừ</p>
+                  <p className="text-xs text-amber-400/80">Can thiệp State & Quản lý danh sách tài khoản TRƯỜNG THPT PHÙ CỪ</p>
                 </div>
               </div>
               <span className="px-2.5 py-1 rounded bg-amber-400/20 text-amber-300 text-[10px] font-mono font-bold">
@@ -1235,7 +1374,7 @@ export default function App() {
               </h3>
               <div className="space-y-2">
                 {usersDb.map((u, i) => (
-                  <div key={i} className="p-3 bg-slate-800/40 rounded-xl border border-slate-700/50 flex items-center justify-between text-xs">
+                  <div key={i} className="p-3 bg-slate-800 rounded-xl border border-slate-700 flex items-center justify-between text-xs">
                     <div>
                       <span className="font-semibold text-white">{u.fullName}</span> ({u.role}) • Lớp: <span className="text-cyan-400">{u.className}</span>
                       <div className="text-[11px] text-slate-400 mt-0.5">Email: {u.email} | SĐT: {u.phone}</div>
@@ -1271,15 +1410,15 @@ export default function App() {
   );
 }
 
-// Component khung viền chuẩn cho từng mục Preview
+// Khung container hiển thị các phân hệ nghiệp vụ khác
 function ModulePreviewContainer({ title, desc, children }) {
   return (
-    <div className="max-w-6xl space-y-4">
+    <div className="max-w-6xl space-y-4 pt-12 md:pt-0">
       <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl">
         <h2 className="text-sm font-bold text-white tracking-tight">{title}</h2>
         <p className="text-xs text-slate-400 mt-0.5">{desc}</p>
       </div>
-      <div className="p-6 bg-slate-900/40 border border-slate-800/80 rounded-2xl overflow-hidden">
+      <div className="p-6 bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
         {children}
       </div>
     </div>
