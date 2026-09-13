@@ -30,7 +30,7 @@ export default function Sidebar({ isOpen, activeTab, onSelectTab, currentUser, o
                 activeTab === 'home' ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/30 font-semibold' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
               }`}
             >
-              <Home className="w-4 h-4" /> <span>Trang chủ cổng trường</span>
+              <Home className="w-4 h-4" /> <span>Trang chủ</span>
             </button>
             <button
               onClick={() => onSelectTab('dashboard')}
