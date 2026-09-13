@@ -1,168 +1,252 @@
 import React, { useState, useEffect } from 'react';
+import { Upload, Download, Plus, Trash2, Edit2, Check, X } from 'lucide-react';
 import ModuleContainer from '../../components/ModuleContainer';
-import { Upload, Download, Plus, Trash2 } from 'lucide-react';
-import { parseDocxTable, exportDocxTable, API_BASE } from '../../utils/wordHandler';
+import { parseDocxLines, exportDocxTable } from '../../utils/wordHandler';
+
+const API = 'http://localhost:5000/api/canbo';
 
 export default function CanBoLopDoan() {
   const [list, setList] = useState([]);
+  const [editingId, setEditingId] = useState(null);
+  const [editForm, setEditForm] = useState({});
   const [form, setForm] = useState({
-    chuc_vu: 'Lớp trưởng', ho_ten: '', so_dien_thoai: '', nhiem_vu: '', loai_can_bo: 'LOP'
+    chuc_vu: '',
+    ho_ten: '',
+    nhiem_vu: '',
+    so_dien_thoai: '',
+    loai_can_bo: 'LOP'
   });
 
-  const fetchList = async () => {
-    try {
-      const res = await fetch(`${API_BASE}/canbo`);
-      if (res.ok) {
-        setList(await res.json());
-        return;
-      }
-    } catch {}
-    const local = localStorage.getItem('tbl_canbo');
-    if (local) setList(JSON.parse(local));
+  const loadData = () => {
+    fetch(API).then(r => r.json()).then(data => setList(Array.isArray(data) ? data : [])).catch(console.error);
   };
 
-  useEffect(() => { fetchList(); }, []);
+  useEffect(() => { loadData(); }, []);
 
-  const saveLocal = (data) => {
-    setList(data);
-    localStorage.setItem('tbl_canbo', JSON.stringify(data));
-  };
-
-  const handleAdd = async (e) => {
+  const handleCreate = async (e) => {
     e.preventDefault();
-    if (!form.ho_ten.trim()) return;
+    if (!form.ho_ten.trim() || !form.chuc_vu.trim()) return;
+    await fetch(API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(form)
+    });
+    setForm({ chuc_vu: '', ho_ten: '', nhiem_vu: '', so_dien_thoai: '', loai_can_bo: 'LOP' });
+    loadData();
+  };
 
-    try {
-      const res = await fetch(`${API_BASE}/canbo`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form)
-      });
-      if (res.ok) {
-        fetchList();
-        setForm({ ...form, ho_ten: '', so_dien_thoai: '', nhiem_vu: '' });
-        return;
-      }
-    } catch {}
-    saveLocal([...list, { id: Date.now(), ...form }]);
-    setForm({ ...form, ho_ten: '', so_dien_thoai: '', nhiem_vu: '' });
+  const handleUpdate = async (id) => {
+    await fetch(`${API}/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(editForm)
+    });
+    setEditingId(null);
+    loadData();
   };
 
   const handleDelete = async (id) => {
-    try {
-      await fetch(`${API_BASE}/canbo/${id}`, { method: 'DELETE' });
-    } catch {}
-    saveLocal(list.filter(item => item.id !== id));
+    if (!window.confirm('Xác nhận xóa cán bộ này?')) return;
+    await fetch(`${API}/${id}`, { method: 'DELETE' });
+    loadData();
   };
 
   const handleImportWord = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    try {
-      const rows = await parseDocxTable(file);
-      const dataRows = (rows[0] && rows[0][1]?.toLowerCase().includes('chức')) ? rows.slice(1) : rows;
-
-      const parsed = dataRows.map((r, i) => ({
-        stt: i + 1,
-        chuc_vu: r[1] || 'Cán bộ',
-        ho_ten: r[2] || '',
-        so_dien_thoai: r[3] || '',
-        nhiem_vu: r[4] || '',
-        loai_can_bo: (r[1]?.toLowerCase().includes('bí thư') || r[1]?.toLowerCase().includes('đoàn')) ? 'DOAN' : 'LOP'
-      })).filter(x => x.ho_ten);
-
-      try {
-        await fetch(`${API_BASE}/canbo/bulk`, {
+    const lines = await parseDocxLines(file);
+    for (const line of lines) {
+      const parts = line.split('|').map(p => p.trim());
+      if (parts.length >= 2) {
+        await fetch(API, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(parsed)
+          body: JSON.stringify({
+            loai_can_bo: parts[0].toUpperCase().includes('ĐOÀN') ? 'DOAN' : 'LOP',
+            chuc_vu: parts[1] || 'Cán bộ',
+            ho_ten: parts[2] || parts[0],
+            nhiem_vu: parts[3] || '',
+            so_dien_thoai: parts[4] || ''
+          })
         });
-        fetchList();
-      } catch {
-        saveLocal([...list, ...parsed]);
       }
-    } catch {
-      alert('Lỗi đọc Word!');
     }
+    loadData();
+    e.target.value = '';
   };
 
   const handleExportWord = () => {
     exportDocxTable({
-      filename: 'Can_Bo_Lop_Doan',
       title: 'DANH SÁCH CÁN BỘ LỚP VÀ CÁN BỘ ĐOÀN',
-      headers: ['STT', 'Phân loại', 'Chức vụ', 'Họ và tên', 'Số điện thoại', 'Nhiệm vụ'],
-      rows: list.map((item, idx) => [
+      headers: ['STT', 'Tổ chức', 'Chức vụ', 'Họ và tên', 'Nhiệm vụ', 'SĐT'],
+      rows: list.map((it, idx) => [
         idx + 1,
-        item.loai_can_bo === 'DOAN' ? 'Chi Đoàn' : 'Ban cán sự Lớp',
-        item.chuc_vu,
-        item.ho_ten,
-        item.so_dien_thoai,
-        item.nhiem_vu
-      ])
+        it.loai_can_bo === 'DOAN' ? 'Chi Đoàn' : 'Ban Cán Sự',
+        it.chuc_vu,
+        it.ho_ten,
+        it.nhiem_vu,
+        it.so_dien_thoai
+      ]),
+      filename: 'Can_Bo_Lop_Doan'
     });
   };
 
   return (
-    <ModuleContainer title="CÁN BỘ LỚP - CÁN BỘ ĐOÀN" desc="Nhập Word, xuất Word, thêm/xóa cán bộ lớp & Đoàn">
+    <ModuleContainer title="DANH SÁCH CÁN BỘ LỚP & CÁN BỘ ĐOÀN" desc="Quản lý Ban cán sự lớp và Chi đoàn (Hỗ trợ nhập/xuất tệp Word .docx)">
       <div className="flex flex-wrap items-center justify-between gap-3 p-4 bg-slate-950/60 border border-slate-800 rounded-xl mb-4">
-        <div className="flex items-center gap-2">
-          <label className="cursor-pointer px-3.5 py-2 bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold rounded-xl text-xs flex items-center gap-1.5 transition">
-            <Upload className="w-4 h-4" /> <span>Nhập Word (.docx)</span>
+        <div className="flex gap-2">
+          <label className="cursor-pointer px-3.5 py-2 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 transition">
+            <Upload className="w-3.5 h-3.5" />
+            <span>Nhập Word (.docx)</span>
             <input type="file" accept=".docx" onChange={handleImportWord} className="hidden" />
           </label>
-          <button onClick={handleExportWord} className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold rounded-xl text-xs flex items-center gap-1.5 border border-slate-700 transition">
-            <Download className="w-4 h-4 text-cyan-400" /> <span>Xuất Word (.docx)</span>
+          <button
+            onClick={handleExportWord}
+            disabled={list.length === 0}
+            className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 transition"
+          >
+            <Download className="w-3.5 h-3.5" />
+            <span>Xuất Word (.docx)</span>
           </button>
         </div>
       </div>
 
-      <form onSubmit={handleAdd} className="grid grid-cols-1 md:grid-cols-6 gap-2 p-4 bg-slate-950/40 border border-slate-800 rounded-xl mb-4 text-xs">
-        <select value={form.loai_can_bo} onChange={e => setForm({ ...form, loai_can_bo: e.target.value })} className="px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:border-cyan-500 outline-none">
-          <option value="LOP">Ban cán sự Lớp</option>
+      <form onSubmit={handleCreate} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-2 mb-4 bg-slate-800/40 p-3 rounded-xl border border-slate-800">
+        <select
+          value={form.loai_can_bo}
+          onChange={e => setForm({ ...form, loai_can_bo: e.target.value })}
+          className="px-2.5 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white"
+        >
+          <option value="LOP">Ban Cán Sự Lớp</option>
           <option value="DOAN">BCH Chi Đoàn</option>
         </select>
-        <input type="text" required placeholder="Chức vụ..." value={form.chuc_vu} onChange={e => setForm({ ...form, chuc_vu: e.target.value })} className="px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:border-cyan-500 outline-none" />
-        <input type="text" required placeholder="Họ và tên..." value={form.ho_ten} onChange={e => setForm({ ...form, ho_ten: e.target.value })} className="px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white md:col-span-2 focus:border-cyan-500 outline-none" />
-        <input type="text" placeholder="Số điện thoại..." value={form.so_dien_thoai} onChange={e => setForm({ ...form, so_dien_thoai: e.target.value })} className="px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:border-cyan-500 outline-none" />
-        <button type="submit" className="px-3 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold rounded-lg flex items-center justify-center gap-1 transition">
-          <Plus className="w-4 h-4" /> Thêm Cán Bộ
+        <input
+          placeholder="Chức vụ *"
+          value={form.chuc_vu}
+          onChange={e => setForm({ ...form, chuc_vu: e.target.value })}
+          className="px-2.5 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white"
+          required
+        />
+        <input
+          placeholder="Họ và tên *"
+          value={form.ho_ten}
+          onChange={e => setForm({ ...form, ho_ten: e.target.value })}
+          className="px-2.5 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white"
+          required
+        />
+        <input
+          placeholder="Nhiệm vụ"
+          value={form.nhiem_vu}
+          onChange={e => setForm({ ...form, nhiem_vu: e.target.value })}
+          className="px-2.5 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white"
+        />
+        <input
+          placeholder="Số điện thoại"
+          value={form.so_dien_thoai}
+          onChange={e => setForm({ ...form, so_dien_thoai: e.target.value })}
+          className="px-2.5 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white"
+        />
+        <button type="submit" className="bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold rounded-lg text-xs flex items-center justify-center gap-1">
+          <Plus className="w-3.5 h-3.5" /> Thêm Cán Bộ
         </button>
       </form>
 
-      <div className="overflow-x-auto rounded-xl border border-slate-800">
-        <table className="w-full text-left text-xs text-slate-300 whitespace-nowrap">
-          <thead className="bg-slate-800 text-slate-400 uppercase text-[10px]">
+      <div className="overflow-x-auto border border-slate-800 rounded-xl">
+        <table className="w-full text-left text-xs text-slate-300">
+          <thead className="bg-slate-800 text-slate-400 uppercase text-[10px] tracking-wider">
             <tr>
-              <th className="p-3">STT</th>
-              <th className="p-3">Phân loại</th>
+              <th className="p-3 w-12 text-center">STT</th>
+              <th className="p-3">Tổ chức</th>
               <th className="p-3">Chức vụ</th>
               <th className="p-3">Họ và tên</th>
-              <th className="p-3">Số điện thoại</th>
-              <th className="p-3 text-right">Xóa</th>
+              <th className="p-3">Nhiệm vụ phụ trách</th>
+              <th className="p-3">SĐT</th>
+              <th className="p-3 text-right">Thao tác</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-800">
-            {list.length === 0 ? (
-              <tr><td colSpan="6" className="py-8 text-center text-slate-500">Chưa có cán bộ nào</td></tr>
-            ) : (
-              list.map((item, idx) => (
-                <tr key={item.id || idx} className="hover:bg-slate-800/40">
-                  <td className="p-3 font-mono text-slate-500">{idx + 1}</td>
-                  <td className="p-3">
-                    <span className={`px-2 py-0.5 rounded text-[10px] font-semibold ${item.loai_can_bo === 'DOAN' ? 'bg-amber-500/20 text-amber-400' : 'bg-cyan-500/20 text-cyan-400'}`}>
-                      {item.loai_can_bo === 'DOAN' ? 'Đoàn' : 'Lớp'}
-                    </span>
-                  </td>
-                  <td className="p-3 font-semibold text-white">{item.chuc_vu}</td>
-                  <td className="p-3 text-slate-200">{item.ho_ten}</td>
-                  <td className="p-3">{item.so_dien_thoai || '-'}</td>
-                  <td className="p-3 text-right">
-                    <button onClick={() => handleDelete(item.id)} className="text-red-400 hover:text-red-300 p-1">
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </td>
+            {list.map((it, idx) => {
+              const isEdit = editingId === it.id;
+              return (
+                <tr key={it.id} className="hover:bg-slate-800/40">
+                  <td className="p-3 text-center text-slate-500 font-mono">{idx + 1}</td>
+                  {isEdit ? (
+                    <>
+                      <td className="p-2">
+                        <select
+                          value={editForm.loai_can_bo}
+                          onChange={e => setEditForm({ ...editForm, loai_can_bo: e.target.value })}
+                          className="px-2 py-1 bg-slate-900 border border-cyan-500/50 rounded text-xs text-white"
+                        >
+                          <option value="LOP">Ban Cán Sự</option>
+                          <option value="DOAN">Chi Đoàn</option>
+                        </select>
+                      </td>
+                      <td className="p-2">
+                        <input
+                          value={editForm.chuc_vu || ''}
+                          onChange={e => setEditForm({ ...editForm, chuc_vu: e.target.value })}
+                          className="w-full px-2 py-1 bg-slate-900 border border-cyan-500/50 rounded text-xs text-white"
+                        />
+                      </td>
+                      <td className="p-2">
+                        <input
+                          value={editForm.ho_ten || ''}
+                          onChange={e => setEditForm({ ...editForm, ho_ten: e.target.value })}
+                          className="w-full px-2 py-1 bg-slate-900 border border-cyan-500/50 rounded text-xs text-white"
+                        />
+                      </td>
+                      <td className="p-2">
+                        <input
+                          value={editForm.nhiem_vu || ''}
+                          onChange={e => setEditForm({ ...editForm, nhiem_vu: e.target.value })}
+                          className="w-full px-2 py-1 bg-slate-900 border border-cyan-500/50 rounded text-xs text-white"
+                        />
+                      </td>
+                      <td className="p-2">
+                        <input
+                          value={editForm.so_dien_thoai || ''}
+                          onChange={e => setEditForm({ ...editForm, so_dien_thoai: e.target.value })}
+                          className="w-full px-2 py-1 bg-slate-900 border border-cyan-500/50 rounded text-xs text-white"
+                        />
+                      </td>
+                      <td className="p-2 text-right">
+                        <div className="flex justify-end gap-1">
+                          <button onClick={() => handleUpdate(it.id)} className="p-1 bg-emerald-600 text-white rounded"><Check className="w-3.5 h-3.5" /></button>
+                          <button onClick={() => setEditingId(null)} className="p-1 bg-slate-700 text-slate-300 rounded"><X className="w-3.5 h-3.5" /></button>
+                        </div>
+                      </td>
+                    </>
+                  ) : (
+                    <>
+                      <td className="p-3">
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${it.loai_can_bo === 'DOAN' ? 'bg-amber-500/10 text-amber-400' : 'bg-cyan-500/10 text-cyan-400'}`}>
+                          {it.loai_can_bo === 'DOAN' ? 'Chi Đoàn' : 'Ban Cán Sự'}
+                        </span>
+                      </td>
+                      <td className="p-3 font-semibold text-white">{it.chuc_vu}</td>
+                      <td className="p-3">{it.ho_ten}</td>
+                      <td className="p-3">{it.nhiem_vu || '-'}</td>
+                      <td className="p-3">{it.so_dien_thoai || '-'}</td>
+                      <td className="p-3 text-right">
+                        <div className="flex justify-end gap-2">
+                          <button onClick={() => { setEditingId(it.id); setEditForm(it); }} className="text-cyan-400 hover:text-cyan-300">
+                            <Edit2 className="w-3.5 h-3.5" />
+                          </button>
+                          <button onClick={() => handleDelete(it.id)} className="text-red-400 hover:text-red-300">
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </td>
+                    </>
+                  )}
                 </tr>
-              ))
+              );
+            })}
+            {list.length === 0 && (
+              <tr>
+                <td colSpan="7" className="py-8 text-center text-slate-500">Chưa có danh sách cán bộ</td>
+              </tr>
             )}
           </tbody>
         </table>

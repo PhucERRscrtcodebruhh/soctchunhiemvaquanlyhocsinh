@@ -1,167 +1,239 @@
 import React, { useState, useEffect } from 'react';
+import { Upload, Download, Plus, Trash2, Edit2, Check, X } from 'lucide-react';
 import ModuleContainer from '../../components/ModuleContainer';
-import { Upload, Download, Plus, Trash2 } from 'lucide-react';
-import { parseDocxTable, exportDocxTable, API_BASE } from '../../utils/wordHandler';
+import { parseDocxLines, exportDocxTable } from '../../utils/wordHandler';
+
+const API = 'http://localhost:5000/api/phuhuynh';
 
 export default function BanDaiDienPHHS() {
   const [list, setList] = useState([]);
+  const [editingId, setEditingId] = useState(null);
+  const [editForm, setEditForm] = useState({});
   const [form, setForm] = useState({
-    ho_ten_ph: '', phu_huynh_em: '', chuc_vu: 'Trưởng ban', so_dien_thoai: '', dia_chi: ''
+    ho_ten_ph: '',
+    phu_huynh_em: '',
+    chuc_vu: 'Thành viên',
+    so_dien_thoai: '',
+    dia_chi: ''
   });
 
-  const fetchList = async () => {
-    try {
-      const res = await fetch(`${API_BASE}/phuhuynh`);
-      if (res.ok) {
-        const data = await res.json();
-        setList(data);
-        return;
-      }
-    } catch {}
-    const local = localStorage.getItem('tbl_phuhuynh');
-    if (local) setList(JSON.parse(local));
+  const loadData = () => {
+    fetch(API).then(r => r.json()).then(data => setList(Array.isArray(data) ? data : [])).catch(console.error);
   };
 
-  useEffect(() => { fetchList(); }, []);
+  useEffect(() => { loadData(); }, []);
 
-  const saveLocal = (data) => {
-    setList(data);
-    localStorage.setItem('tbl_phuhuynh', JSON.stringify(data));
-  };
-
-  const handleAdd = async (e) => {
+  const handleCreate = async (e) => {
     e.preventDefault();
     if (!form.ho_ten_ph.trim()) return;
+    await fetch(API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(form)
+    });
+    setForm({ ho_ten_ph: '', phu_huynh_em: '', chuc_vu: 'Thành viên', so_dien_thoai: '', dia_chi: '' });
+    loadData();
+  };
 
-    const newObj = { ...form, stt: list.length + 1 };
-    try {
-      const res = await fetch(`${API_BASE}/phuhuynh`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newObj)
-      });
-      if (res.ok) {
-        fetchList();
-        setForm({ ho_ten_ph: '', phu_huynh_em: '', chuc_vu: 'Trưởng ban', so_dien_thoai: '', dia_chi: '' });
-        return;
-      }
-    } catch {}
-    saveLocal([...list, { id: Date.now(), ...newObj }]);
-    setForm({ ho_ten_ph: '', phu_huynh_em: '', chuc_vu: 'Trưởng ban', so_dien_thoai: '', dia_chi: '' });
+  const handleUpdate = async (id) => {
+    await fetch(`${API}/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(editForm)
+    });
+    setEditingId(null);
+    loadData();
   };
 
   const handleDelete = async (id) => {
-    try {
-      await fetch(`${API_BASE}/phuhuynh/${id}`, { method: 'DELETE' });
-    } catch {}
-    saveLocal(list.filter(item => item.id !== id));
+    if (!window.confirm('Xác nhận xóa phụ huynh này?')) return;
+    await fetch(`${API}/${id}`, { method: 'DELETE' });
+    loadData();
   };
 
   const handleImportWord = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    try {
-      const rows = await parseDocxTable(file);
-      const dataRows = (rows[0] && (rows[0][0]?.toLowerCase().includes('stt') || rows[0][1]?.toLowerCase().includes('họ')))
-        ? rows.slice(1)
-        : rows;
-
-      const parsed = dataRows.map((r, i) => ({
-        stt: parseInt(r[0]) || (i + 1),
-        ho_ten_ph: r[1] || '',
-        phu_huynh_em: r[2] || '',
-        chuc_vu: r[3] || 'Thành viên',
-        so_dien_thoai: r[4] || '',
-        dia_chi: r[5] || ''
-      })).filter(x => x.ho_ten_ph);
-
-      try {
-        await fetch(`${API_BASE}/phuhuynh/bulk`, {
+    const lines = await parseDocxLines(file);
+    for (const line of lines) {
+      const parts = line.split('|').map(p => p.trim());
+      if (parts.length >= 1 && parts[0]) {
+        await fetch(API, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(parsed)
+          body: JSON.stringify({
+            ho_ten_ph: parts[0],
+            phu_huynh_em: parts[1] || '',
+            chuc_vu: parts[2] || 'Ủy viên',
+            so_dien_thoai: parts[3] || '',
+            dia_chi: parts[4] || ''
+          })
         });
-        fetchList();
-      } catch {
-        saveLocal([...list, ...parsed]);
       }
-    } catch (err) {
-      alert('Không đọc được bảng từ file Word. Hãy đảm bảo file có chứa Table!');
     }
+    loadData();
+    e.target.value = '';
   };
 
   const handleExportWord = () => {
     exportDocxTable({
-      filename: 'Ban_Dai_Dien_PHHS',
-      title: 'DANH SÁCH BAN ĐẠI DIỆN HỘI CHA MẸ HỌC SINH',
+      title: 'BAN ĐẠI DIỆN HỘI CHA MẸ HỌC SINH',
       headers: ['STT', 'Họ và tên PHHS', 'Phụ huynh của em', 'Chức vụ', 'Số điện thoại', 'Địa chỉ'],
-      rows: list.map((item, idx) => [
-        idx + 1, item.ho_ten_ph, item.phu_huynh_em, item.chuc_vu, item.so_dien_thoai, item.dia_chi
-      ])
+      rows: list.map((item, idx) => [idx + 1, item.ho_ten_ph, item.phu_huynh_em, item.chuc_vu, item.so_dien_thoai, item.dia_chi]),
+      filename: 'Ban_Dai_Dien_PHHS'
     });
   };
 
   return (
-    <ModuleContainer title="BAN ĐẠI DIỆN HỘI CHA MẸ HỌC SINH" desc="Hỗ trợ nhập Word, xuất Word, thêm & xóa phụ huynh (Đồng bộ MySQL)">
+    <ModuleContainer title="BAN ĐẠI DIỆN HỘI CHA MẸ HỌC SINH" desc="Quản lý thông tin Ban đại diện PHHS (Hỗ trợ nhập/xuất tệp Word .docx)">
       <div className="flex flex-wrap items-center justify-between gap-3 p-4 bg-slate-950/60 border border-slate-800 rounded-xl mb-4">
-        <div className="flex items-center gap-2">
-          <label className="cursor-pointer px-3.5 py-2 bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold rounded-xl text-xs flex items-center gap-1.5 transition">
-            <Upload className="w-4 h-4" />
+        <div className="flex gap-2">
+          <label className="cursor-pointer px-3.5 py-2 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 transition">
+            <Upload className="w-3.5 h-3.5" />
             <span>Nhập Word (.docx)</span>
             <input type="file" accept=".docx" onChange={handleImportWord} className="hidden" />
           </label>
-          <button onClick={handleExportWord} className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold rounded-xl text-xs flex items-center gap-1.5 border border-slate-700 transition">
-            <Download className="w-4 h-4 text-cyan-400" />
+          <button
+            onClick={handleExportWord}
+            disabled={list.length === 0}
+            className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 transition"
+          >
+            <Download className="w-3.5 h-3.5" />
             <span>Xuất Word (.docx)</span>
           </button>
         </div>
       </div>
 
-      <form onSubmit={handleAdd} className="grid grid-cols-1 md:grid-cols-6 gap-2 p-4 bg-slate-950/40 border border-slate-800 rounded-xl mb-4 text-xs">
-        <input type="text" required placeholder="Họ và tên PHHS..." value={form.ho_ten_ph} onChange={e => setForm({ ...form, ho_ten_ph: e.target.value })} className="px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white md:col-span-2 focus:border-cyan-500 outline-none" />
-        <input type="text" placeholder="Phụ huynh của em..." value={form.phu_huynh_em} onChange={e => setForm({ ...form, phu_huynh_em: e.target.value })} className="px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:border-cyan-500 outline-none" />
-        <select value={form.chuc_vu} onChange={e => setForm({ ...form, chuc_vu: e.target.value })} className="px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:border-cyan-500 outline-none">
-          <option value="Trưởng ban">Trưởng ban</option>
-          <option value="Phó ban">Phó ban</option>
-          <option value="Ủy viên">Ủy viên</option>
-          <option value="Thành viên">Thành viên</option>
-        </select>
-        <input type="text" placeholder="Số điện thoại..." value={form.so_dien_thoai} onChange={e => setForm({ ...form, so_dien_thoai: e.target.value })} className="px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:border-cyan-500 outline-none" />
-        <button type="submit" className="px-3 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold rounded-lg flex items-center justify-center gap-1 transition">
-          <Plus className="w-4 h-4" /> Thêm PHHS
+      <form onSubmit={handleCreate} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-2 mb-4 bg-slate-800/40 p-3 rounded-xl border border-slate-800">
+        <input
+          placeholder="Họ tên PHHS *"
+          value={form.ho_ten_ph}
+          onChange={e => setForm({ ...form, ho_ten_ph: e.target.value })}
+          className="px-2.5 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white"
+          required
+        />
+        <input
+          placeholder="PH em..."
+          value={form.phu_huynh_em}
+          onChange={e => setForm({ ...form, phu_huynh_em: e.target.value })}
+          className="px-2.5 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white"
+        />
+        <input
+          placeholder="Chức vụ"
+          value={form.chuc_vu}
+          onChange={e => setForm({ ...form, chuc_vu: e.target.value })}
+          className="px-2.5 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white"
+        />
+        <input
+          placeholder="Số điện thoại"
+          value={form.so_dien_thoai}
+          onChange={e => setForm({ ...form, so_dien_thoai: e.target.value })}
+          className="px-2.5 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white"
+        />
+        <input
+          placeholder="Địa chỉ"
+          value={form.dia_chi}
+          onChange={e => setForm({ ...form, dia_chi: e.target.value })}
+          className="px-2.5 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white"
+        />
+        <button type="submit" className="bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold rounded-lg text-xs flex items-center justify-center gap-1">
+          <Plus className="w-3.5 h-3.5" /> Thêm PH
         </button>
       </form>
 
-      <div className="overflow-x-auto rounded-xl border border-slate-800">
-        <table className="w-full text-left text-xs text-slate-300 whitespace-nowrap">
-          <thead className="bg-slate-800 text-slate-400 uppercase text-[10px]">
+      <div className="overflow-x-auto border border-slate-800 rounded-xl">
+        <table className="w-full text-left text-xs text-slate-300">
+          <thead className="bg-slate-800 text-slate-400 uppercase text-[10px] tracking-wider">
             <tr>
-              <th className="p-3">STT</th>
-              <th className="p-3">Họ và tên PHHS</th>
-              <th className="p-3">Phụ huynh em</th>
+              <th className="p-3 w-12 text-center">STT</th>
+              <th className="p-3">Họ và tên PH</th>
+              <th className="p-3">PH em</th>
               <th className="p-3">Chức vụ</th>
-              <th className="p-3">Số điện thoại</th>
-              <th className="p-3 text-right">Xóa</th>
+              <th className="p-3">SĐT</th>
+              <th className="p-3">Địa chỉ</th>
+              <th className="p-3 text-right">Thao tác</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-800">
-            {list.length === 0 ? (
-              <tr><td colSpan="6" className="py-8 text-center text-slate-500">Chưa có dữ liệu</td></tr>
-            ) : (
-              list.map((item, idx) => (
-                <tr key={item.id || idx} className="hover:bg-slate-800/40">
-                  <td className="p-3 font-mono text-slate-500">{idx + 1}</td>
-                  <td className="p-3 font-semibold text-white">{item.ho_ten_ph}</td>
-                  <td className="p-3 text-slate-400">{item.phu_huynh_em || '-'}</td>
-                  <td className="p-3 text-cyan-400">{item.chuc_vu}</td>
-                  <td className="p-3">{item.so_dien_thoai || '-'}</td>
-                  <td className="p-3 text-right">
-                    <button onClick={() => handleDelete(item.id)} className="text-red-400 hover:text-red-300 p-1">
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </td>
+            {list.map((it, idx) => {
+              const isEdit = editingId === it.id;
+              return (
+                <tr key={it.id} className="hover:bg-slate-800/40">
+                  <td className="p-3 text-center text-slate-500 font-mono">{idx + 1}</td>
+                  {isEdit ? (
+                    <>
+                      <td className="p-2">
+                        <input
+                          value={editForm.ho_ten_ph || ''}
+                          onChange={e => setEditForm({ ...editForm, ho_ten_ph: e.target.value })}
+                          className="w-full px-2 py-1 bg-slate-900 border border-cyan-500/50 rounded text-xs text-white"
+                        />
+                      </td>
+                      <td className="p-2">
+                        <input
+                          value={editForm.phu_huynh_em || ''}
+                          onChange={e => setEditForm({ ...editForm, phu_huynh_em: e.target.value })}
+                          className="w-full px-2 py-1 bg-slate-900 border border-cyan-500/50 rounded text-xs text-white"
+                        />
+                      </td>
+                      <td className="p-2">
+                        <input
+                          value={editForm.chuc_vu || ''}
+                          onChange={e => setEditForm({ ...editForm, chuc_vu: e.target.value })}
+                          className="w-full px-2 py-1 bg-slate-900 border border-cyan-500/50 rounded text-xs text-white"
+                        />
+                      </td>
+                      <td className="p-2">
+                        <input
+                          value={editForm.so_dien_thoai || ''}
+                          onChange={e => setEditForm({ ...editForm, so_dien_thoai: e.target.value })}
+                          className="w-full px-2 py-1 bg-slate-900 border border-cyan-500/50 rounded text-xs text-white"
+                        />
+                      </td>
+                      <td className="p-2">
+                        <input
+                          value={editForm.dia_chi || ''}
+                          onChange={e => setEditForm({ ...editForm, dia_chi: e.target.value })}
+                          className="w-full px-2 py-1 bg-slate-900 border border-cyan-500/50 rounded text-xs text-white"
+                        />
+                      </td>
+                      <td className="p-2 text-right">
+                        <div className="flex justify-end gap-1">
+                          <button onClick={() => handleUpdate(it.id)} className="p-1 bg-emerald-600 text-white rounded"><Check className="w-3.5 h-3.5" /></button>
+                          <button onClick={() => setEditingId(null)} className="p-1 bg-slate-700 text-slate-300 rounded"><X className="w-3.5 h-3.5" /></button>
+                        </div>
+                      </td>
+                    </>
+                  ) : (
+                    <>
+                      <td className="p-3 font-semibold text-white">{it.ho_ten_ph}</td>
+                      <td className="p-3">{it.phu_huynh_em || '-'}</td>
+                      <td className="p-3">
+                        <span className="px-2 py-0.5 rounded bg-cyan-500/10 text-cyan-400 font-semibold text-[10px]">
+                          {it.chuc_vu}
+                        </span>
+                      </td>
+                      <td className="p-3">{it.so_dien_thoai || '-'}</td>
+                      <td className="p-3">{it.dia_chi || '-'}</td>
+                      <td className="p-3 text-right">
+                        <div className="flex justify-end gap-2">
+                          <button onClick={() => { setEditingId(it.id); setEditForm(it); }} className="text-cyan-400 hover:text-cyan-300">
+                            <Edit2 className="w-3.5 h-3.5" />
+                          </button>
+                          <button onClick={() => handleDelete(it.id)} className="text-red-400 hover:text-red-300">
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </td>
+                    </>
+                  )}
                 </tr>
-              ))
+              );
+            })}
+            {list.length === 0 && (
+              <tr>
+                <td colSpan="7" className="py-8 text-center text-slate-500">Chưa có thông tin ban đại diện cha mẹ học sinh</td>
+              </tr>
             )}
           </tbody>
         </table>

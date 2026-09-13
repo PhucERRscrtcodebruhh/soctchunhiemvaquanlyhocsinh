@@ -221,6 +221,333 @@ app.delete('/api/to-hocsinh/:id', async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+// ==========================================
+// 1. THEO DÕI HỌC TẬP & RÈN LUYỆN
+// ==========================================
+app.get('/api/theodoi', async (req, res) => {
+  try {
+    const [rows] = await pool.query('SELECT * FROM tbl_theodoi ORDER BY ngay_thang DESC, id DESC');
+    res.json(rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/theodoi', async (req, res) => {
+  const { ngay_thang, ho_ten, mon_hoc, diem_nhan_xet, vi_pham_khen_thuong } = req.body;
+  try {
+    const [result] = await pool.query(
+      'INSERT INTO tbl_theodoi (ngay_thang, ho_ten, mon_hoc, diem_nhan_xet, vi_pham_khen_thuong) VALUES (?, ?, ?, ?, ?)',
+      [ngay_thang || new Date().toISOString().slice(0, 10), ho_ten, mon_hoc || '', diem_nhan_xet || '', vi_pham_khen_thuong || '']
+    );
+    res.json({ id: result.insertId, ...req.body });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.put('/api/theodoi/:id', async (req, res) => {
+  const { ngay_thang, ho_ten, mon_hoc, diem_nhan_xet, vi_pham_khen_thuong } = req.body;
+  try {
+    await pool.query(
+      'UPDATE tbl_theodoi SET ngay_thang=?, ho_ten=?, mon_hoc=?, diem_nhan_xet=?, vi_pham_khen_thuong=? WHERE id=?',
+      [ngay_thang, ho_ten, mon_hoc, diem_nhan_xet, vi_pham_khen_thuong, req.params.id]
+    );
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/theodoi/:id', async (req, res) => {
+  try {
+    await pool.query('DELETE FROM tbl_theodoi WHERE id=?', [req.params.id]);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ==========================================
+// 2. GIÁO DỤC HỌC SINH CÁ BIỆT
+// ==========================================
+app.get('/api/cabiet', async (req, res) => {
+  try {
+    const [rows] = await pool.query('SELECT * FROM tbl_cabiet ORDER BY id ASC');
+    res.json(rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/cabiet', async (req, res) => {
+  const { ho_ten, bieu_hien, bien_phap, xac_nhan_ph } = req.body;
+  try {
+    const [result] = await pool.query(
+      'INSERT INTO tbl_cabiet (ho_ten, bieu_hien, bien_phap, xac_nhan_ph) VALUES (?, ?, ?, ?)',
+      [ho_ten, bieu_hien || '', bien_phap || '', xac_nhan_ph || 'Chưa ký']
+    );
+    res.json({ id: result.insertId, ...req.body });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.put('/api/cabiet/:id', async (req, res) => {
+  const { ho_ten, bieu_hien, bien_phap, xac_nhan_ph } = req.body;
+  try {
+    await pool.query(
+      'UPDATE tbl_cabiet SET ho_ten=?, bieu_hien=?, bien_phap=?, xac_nhan_ph=? WHERE id=?',
+      [ho_ten, bieu_hien, bien_phap, xac_nhan_ph, req.params.id]
+    );
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/cabiet/:id', async (req, res) => {
+  try {
+    await pool.query('DELETE FROM tbl_cabiet WHERE id=?', [req.params.id]);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ==========================================
+// 3. BIÊN BẢN & KẾ HOẠCH SINH HOẠT LỚP
+// ==========================================
+app.get('/api/sinhhoat', async (req, res) => {
+  try {
+    const [rows] = await pool.query('SELECT * FROM tbl_sinhhoat ORDER BY tuan DESC, id DESC');
+    res.json(rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/sinhhoat', async (req, res) => {
+  const { tuan, ngay_hop, danh_gia, phuong_huong, tuyen_duong } = req.body;
+  try {
+    const [result] = await pool.query(
+      'INSERT INTO tbl_sinhhoat (tuan, ngay_hop, danh_gia, phuong_huong, tuyen_duong) VALUES (?, ?, ?, ?, ?)',
+      [tuan || 1, ngay_hop || new Date().toISOString().slice(0, 10), danh_gia || '', phuong_huong || '', tuyen_duong || '']
+    );
+    res.json({ id: result.insertId, ...req.body });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.put('/api/sinhhoat/:id', async (req, res) => {
+  const { tuan, ngay_hop, danh_gia, phuong_huong, tuyen_duong } = req.body;
+  try {
+    await pool.query(
+      'UPDATE tbl_sinhhoat SET tuan=?, ngay_hop=?, danh_gia=?, phuong_huong=?, tuyen_duong=? WHERE id=?',
+      [tuan, ngay_hop, danh_gia, phuong_huong, tuyen_duong, req.params.id]
+    );
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/sinhhoat/:id', async (req, res) => {
+  try {
+    await pool.query('DELETE FROM tbl_sinhhoat WHERE id=?', [req.params.id]);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+// ==========================================
+// 1. TỔNG HỢP XẾP LOẠI THÔNG TƯ 22
+// ==========================================
+app.get('/api/tt22', async (req, res) => {
+  try {
+    const [rows] = await pool.query('SELECT * FROM tbl_danhgia_tt22 ORDER BY id ASC');
+    res.json(rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/tt22', async (req, res) => {
+  const { ho_ten, hk1_ht, hk1_rl, cn_ht, danh_hieu } = req.body;
+  try {
+    const [result] = await pool.query(
+      'INSERT INTO tbl_danhgia_tt22 (ho_ten, hk1_ht, hk1_rl, cn_ht, danh_hieu) VALUES (?, ?, ?, ?, ?)',
+      [ho_ten, hk1_ht || 'Đạt', hk1_rl || 'Tốt', cn_ht || 'Đạt', danh_hieu || 'Học sinh tiên tiến']
+    );
+    res.json({ id: result.insertId, ...req.body });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.put('/api/tt22/:id', async (req, res) => {
+  const { ho_ten, hk1_ht, hk1_rl, cn_ht, danh_hieu } = req.body;
+  try {
+    await pool.query(
+      'UPDATE tbl_danhgia_tt22 SET ho_ten=?, hk1_ht=?, hk1_rl=?, cn_ht=?, danh_hieu=? WHERE id=?',
+      [ho_ten, hk1_ht, hk1_rl, cn_ht, danh_hieu, req.params.id]
+    );
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/tt22/:id', async (req, res) => {
+  try {
+    await pool.query('DELETE FROM tbl_danhgia_tt22 WHERE id=?', [req.params.id]);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ==========================================
+// 2. XẾP LOẠI THI ĐUA ĐOÀN TRƯỜNG
+// ==========================================
+app.get('/api/thidua', async (req, res) => {
+  try {
+    const [rows] = await pool.query('SELECT * FROM tbl_thidua ORDER BY tuan ASC');
+    res.json(rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/thidua', async (req, res) => {
+  const { tuan, diem_so, hang_khoi, hang_truong, co_thi_dua } = req.body;
+  try {
+    const [result] = await pool.query(
+      'INSERT INTO tbl_thidua (tuan, diem_so, hang_khoi, hang_truong, co_thi_dua) VALUES (?, ?, ?, ?, ?)',
+      [tuan || 1, diem_so || 100, hang_khoi || 1, hang_truong || 1, co_thi_dua || 'Cờ Nhất']
+    );
+    res.json({ id: result.insertId, ...req.body });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.put('/api/thidua/:id', async (req, res) => {
+  const { tuan, diem_so, hang_khoi, hang_truong, co_thi_dua } = req.body;
+  try {
+    await pool.query(
+      'UPDATE tbl_thidua SET tuan=?, diem_so=?, hang_khoi=?, hang_truong=?, co_thi_dua=? WHERE id=?',
+      [tuan, diem_so, hang_khoi, hang_truong, co_thi_dua, req.params.id]
+    );
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/thidua/:id', async (req, res) => {
+  try {
+    await pool.query('DELETE FROM tbl_thidua WHERE id=?', [req.params.id]);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ==========================================
+// 3. BIÊN BẢN BÀN GIAO NGHỈ TẾT & HÈ
+// ==========================================
+app.get('/api/bangiao', async (req, res) => {
+  try {
+    const [rows] = await pool.query('SELECT * FROM tbl_bangiao ORDER BY id DESC');
+    res.json(rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/bangiao', async (req, res) => {
+  const { dot_ban_giao, ngay_ban_giao, si_so, tinh_trang, dai_dien_dia_phuong } = req.body;
+  try {
+    const [result] = await pool.query(
+      'INSERT INTO tbl_bangiao (dot_ban_giao, ngay_ban_giao, si_so, tinh_trang, dai_dien_dia_phuong) VALUES (?, ?, ?, ?, ?)',
+      [dot_ban_giao, ngay_ban_giao || new Date().toISOString().slice(0, 10), si_so || 0, tinh_trang || '', dai_dien_dia_phuong || '']
+    );
+    res.json({ id: result.insertId, ...req.body });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.put('/api/bangiao/:id', async (req, res) => {
+  const { dot_ban_giao, ngay_ban_giao, si_so, tinh_trang, dai_dien_dia_phuong } = req.body;
+  try {
+    await pool.query(
+      'UPDATE tbl_bangiao SET dot_ban_giao=?, ngay_ban_giao=?, si_so=?, tinh_trang=?, dai_dien_dia_phuong=? WHERE id=?',
+      [dot_ban_giao, ngay_ban_giao, si_so, tinh_trang, dai_dien_dia_phuong, req.params.id]
+    );
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/bangiao/:id', async (req, res) => {
+  try {
+    await pool.query('DELETE FROM tbl_bangiao WHERE id=?', [req.params.id]);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ==========================================
+// 4. BGH KIỂM TRA & NHẬN XÉT SỔ
+// ==========================================
+app.get('/api/bgh', async (req, res) => {
+  try {
+    const [rows] = await pool.query('SELECT * FROM tbl_kiemtra_bgh ORDER BY id ASC');
+    res.json(rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/bgh', async (req, res) => {
+  const { dot_kiem_tra, ngay_duyet, y_kien_bgh, xep_loai } = req.body;
+  try {
+    const [result] = await pool.query(
+      'INSERT INTO tbl_kiemtra_bgh (dot_kiem_tra, ngay_duyet, y_kien_bgh, xep_loai) VALUES (?, ?, ?, ?)',
+      [dot_kiem_tra, ngay_duyet || new Date().toISOString().slice(0, 10), y_kien_bgh || '', xep_loai || 'Tốt']
+    );
+    res.json({ id: result.insertId, ...req.body });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.put('/api/bgh/:id', async (req, res) => {
+  const { dot_kiem_tra, ngay_duyet, y_kien_bgh, xep_loai } = req.body;
+  try {
+    await pool.query(
+      'UPDATE tbl_kiemtra_bgh SET dot_kiem_tra=?, ngay_duyet=?, y_kien_bgh=?, xep_loai=? WHERE id=?',
+      [dot_kiem_tra, ngay_duyet, y_kien_bgh, xep_loai, req.params.id]
+    );
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/bgh/:id', async (req, res) => {
+  try {
+    await pool.query('DELETE FROM tbl_kiemtra_bgh WHERE id=?', [req.params.id]);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
 app.listen(5000, () => {
   console.log('MySQL Backend API listening on http://localhost:5000');
