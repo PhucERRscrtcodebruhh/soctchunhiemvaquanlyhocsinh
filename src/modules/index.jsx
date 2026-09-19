@@ -15,10 +15,38 @@ import { parseDocxLines, exportDocxTable } from '../utils/wordHandler';
 
 // 1. SƠ YẾU LÝ LỊCH HỌC SINH (MODULE DUY NHẤT DÙNG EXCEL)
 export function LyLichHocSinh({ classData }) {
-  const [columns, setColumns] = useState(['STT', 'Họ và tên', 'Ngày sinh', 'Giới tính', 'Họ tên Cha/Mẹ', 'SĐT']);
-  const [rows, setRows] = useState([]);
-  const [fileName, setFileName] = useState('');
+  const [columns, setColumns] = useState(() => {
+    try {
+      const saved = localStorage.getItem('sotay_lylich_cols');
+      return saved ? JSON.parse(saved) : ['STT', 'Họ và tên', 'Ngày sinh', 'Giới tính', 'Họ tên Cha/Mẹ', 'SĐT'];
+    } catch {
+      return ['STT', 'Họ và tên', 'Ngày sinh', 'Giới tính', 'Họ tên Cha/Mẹ', 'SĐT'];
+    }
+  });
+  const [rows, setRows] = useState(() => {
+    try {
+      const saved = localStorage.getItem('sotay_lylich_rows');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+  const [fileName, setFileName] = useState(() => {
+    try {
+      return localStorage.getItem('sotay_lylich_filename') || '';
+    } catch {
+      return '';
+    }
+  });
   const [newRow, setNewRow] = useState({ name: '', dob: '', gender: 'Nam', parent: '', phone: '' });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('sotay_lylich_cols', JSON.stringify(columns));
+      localStorage.setItem('sotay_lylich_rows', JSON.stringify(rows));
+      localStorage.setItem('sotay_lylich_filename', fileName);
+    } catch {}
+  }, [columns, rows, fileName]);
 
   const handleFileUpload = (e) => {
     const file = e.target.files[0];
@@ -68,7 +96,18 @@ export function LyLichHocSinh({ classData }) {
           )}
         </div>
         {rows.length > 0 && (
-          <button onClick={() => { setRows([]); setFileName(''); }} className="px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-xl text-xs flex items-center gap-1.5 border border-red-500/20 transition">
+          <button 
+            onClick={() => { 
+              setRows([]); 
+              setFileName(''); 
+              try {
+                localStorage.removeItem('sotay_lylich_cols'); 
+                localStorage.removeItem('sotay_lylich_rows'); 
+                localStorage.removeItem('sotay_lylich_filename'); 
+              } catch {}
+            }} 
+            className="px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-xl text-xs flex items-center gap-1.5 border border-red-500/20 transition"
+          >
             <Trash2 className="w-3.5 h-3.5" />
             <span>Xóa bảng</span>
           </button>
@@ -135,7 +174,7 @@ export function BanDaiDienPHHS() {
   const [form, setForm] = useState({ ho_ten_ph: '', phu_huynh_em: '', chuc_vu: 'Thành viên', so_dien_thoai: '', dia_chi: '' });
 
   const loadData = () => {
-    fetch('http://localhost:5000/api/phuhuynh')
+    fetch('/api/phuhuynh')
       .then(r => r.json())
       .then(data => setList(Array.isArray(data) ? data : []))
       .catch(console.error);
@@ -146,7 +185,7 @@ export function BanDaiDienPHHS() {
   const handleCreate = async (e) => {
     e.preventDefault();
     if (!form.ho_ten_ph.trim()) return;
-    await fetch('http://localhost:5000/api/phuhuynh', {
+    await fetch('/api/phuhuynh', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(form)
@@ -156,7 +195,7 @@ export function BanDaiDienPHHS() {
   };
 
   const handleUpdate = async (id) => {
-    await fetch(`http://localhost:5000/api/phuhuynh/${id}`, {
+    await fetch(`/api/phuhuynh/${id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(editForm)
@@ -167,7 +206,7 @@ export function BanDaiDienPHHS() {
 
   const handleDelete = async (id) => {
     if (!window.confirm('Xác nhận xóa phụ huynh này?')) return;
-    await fetch(`http://localhost:5000/api/phuhuynh/${id}`, { method: 'DELETE' });
+    await fetch(`/api/phuhuynh/${id}`, { method: 'DELETE' });
     loadData();
   };
 
@@ -178,7 +217,7 @@ export function BanDaiDienPHHS() {
     for (const line of lines) {
       const parts = line.split('|').map(p => p.trim());
       if (parts.length >= 1 && parts[0]) {
-        await fetch('http://localhost:5000/api/phuhuynh', {
+        await fetch('/api/phuhuynh', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -300,7 +339,7 @@ export function CanBoLopDoan() {
   const [form, setForm] = useState({ chuc_vu: '', ho_ten: '', nhiem_vu: '', so_dien_thoai: '', loai_can_bo: 'LOP' });
 
   const loadData = () => {
-    fetch('http://localhost:5000/api/canbo')
+    fetch('/api/canbo')
       .then(r => r.json())
       .then(data => setList(Array.isArray(data) ? data : []))
       .catch(console.error);
@@ -311,7 +350,7 @@ export function CanBoLopDoan() {
   const handleCreate = async (e) => {
     e.preventDefault();
     if (!form.ho_ten.trim() || !form.chuc_vu.trim()) return;
-    await fetch('http://localhost:5000/api/canbo', {
+    await fetch('/api/canbo', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(form)
@@ -321,7 +360,7 @@ export function CanBoLopDoan() {
   };
 
   const handleUpdate = async (id) => {
-    await fetch(`http://localhost:5000/api/canbo/${id}`, {
+    await fetch(`/api/canbo/${id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(editForm)
@@ -332,7 +371,7 @@ export function CanBoLopDoan() {
 
   const handleDelete = async (id) => {
     if (!window.confirm('Xác nhận xóa cán bộ này?')) return;
-    await fetch(`http://localhost:5000/api/canbo/${id}`, { method: 'DELETE' });
+    await fetch(`/api/canbo/${id}`, { method: 'DELETE' });
     loadData();
   };
 
@@ -343,7 +382,7 @@ export function CanBoLopDoan() {
     for (const line of lines) {
       const parts = line.split('|').map(p => p.trim());
       if (parts.length >= 2) {
-        await fetch('http://localhost:5000/api/canbo', {
+        await fetch('/api/canbo', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -479,7 +518,7 @@ export function SoDoLopHoc() {
   const [editForm, setEditForm] = useState({});
 
   const loadData = () => {
-    fetch('http://localhost:5000/api/to-hocsinh')
+    fetch('/api/to-hocsinh')
       .then(r => r.json())
       .then(data => setStudents(Array.isArray(data) ? data : []))
       .catch(console.error);
@@ -490,7 +529,7 @@ export function SoDoLopHoc() {
   const handleAddHS = async (e) => {
     e.preventDefault();
     if (!hoTen.trim()) return;
-    await fetch('http://localhost:5000/api/to-hocsinh', {
+    await fetch('/api/to-hocsinh', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ to_so: toSo, ho_ten: hoTen.trim(), chuc_vu_to: chucVu })
@@ -500,7 +539,7 @@ export function SoDoLopHoc() {
   };
 
   const handleUpdateHS = async (id) => {
-    await fetch(`http://localhost:5000/api/to-hocsinh/${id}`, {
+    await fetch(`/api/to-hocsinh/${id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(editForm)
@@ -511,7 +550,7 @@ export function SoDoLopHoc() {
 
   const handleDeleteHS = async (id) => {
     if (!window.confirm('Xác nhận xóa học sinh khỏi tổ?')) return;
-    await fetch(`http://localhost:5000/api/to-hocsinh/${id}`, { method: 'DELETE' });
+    await fetch(`/api/to-hocsinh/${id}`, { method: 'DELETE' });
     loadData();
   };
 
@@ -522,7 +561,7 @@ export function SoDoLopHoc() {
     for (const line of lines) {
       const parts = line.split('|').map(p => p.trim());
       if (parts.length >= 2) {
-        await fetch('http://localhost:5000/api/to-hocsinh', {
+        await fetch('/api/to-hocsinh', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -641,8 +680,8 @@ export function ThoiKhoaBieu() {
   const [newRow, setNewRow] = useState({ buoi: 'SANG', tiet: 1, thu_2: '', thu_3: '', thu_4: '', thu_5: '', thu_6: '', thu_7: '' });
 
   const loadData = () => {
-    fetch('http://localhost:5000/api/tkb/init', { method: 'POST' }).then(() => {
-      fetch('http://localhost:5000/api/tkb')
+    fetch('/api/tkb/init', { method: 'POST' }).then(() => {
+      fetch('/api/tkb')
         .then(r => r.json())
         .then(data => setSchedule(Array.isArray(data) ? data : []))
         .catch(console.error);
@@ -653,7 +692,7 @@ export function ThoiKhoaBieu() {
 
   const handleCreatePeriod = async (e) => {
     e.preventDefault();
-    await fetch('http://localhost:5000/api/tkb', {
+    await fetch('/api/tkb', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(newRow)
@@ -663,7 +702,7 @@ export function ThoiKhoaBieu() {
   };
 
   const handleSaveEdit = async (id) => {
-    await fetch(`http://localhost:5000/api/tkb/${id}`, {
+    await fetch(`/api/tkb/${id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(editRow)
@@ -674,7 +713,7 @@ export function ThoiKhoaBieu() {
 
   const handleDeletePeriod = async (id) => {
     if (!window.confirm('Xác nhận xóa tiết học này?')) return;
-    await fetch(`http://localhost:5000/api/tkb/${id}`, { method: 'DELETE' });
+    await fetch(`/api/tkb/${id}`, { method: 'DELETE' });
     loadData();
   };
 
@@ -685,7 +724,7 @@ export function ThoiKhoaBieu() {
     for (const line of lines) {
       const parts = line.split('|').map(p => p.trim());
       if (parts.length >= 2) {
-        await fetch('http://localhost:5000/api/tkb', {
+        await fetch('/api/tkb', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -809,7 +848,7 @@ export function TheoDoiHocTap() {
   });
 
   const loadData = () => {
-    fetch('http://localhost:5000/api/theodoi')
+    fetch('/api/theodoi')
       .then(r => r.json())
       .then(data => setList(Array.isArray(data) ? data : []))
       .catch(console.error);
@@ -820,7 +859,7 @@ export function TheoDoiHocTap() {
   const handleCreate = async (e) => {
     e.preventDefault();
     if (!form.ho_ten.trim()) return;
-    await fetch('http://localhost:5000/api/theodoi', {
+    await fetch('/api/theodoi', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(form)
@@ -830,7 +869,7 @@ export function TheoDoiHocTap() {
   };
 
   const handleUpdate = async (id) => {
-    await fetch(`http://localhost:5000/api/theodoi/${id}`, {
+    await fetch(`/api/theodoi/${id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(editForm)
@@ -841,7 +880,7 @@ export function TheoDoiHocTap() {
 
   const handleDelete = async (id) => {
     if (!window.confirm('Xác nhận xóa bản ghi theo dõi này?')) return;
-    await fetch(`http://localhost:5000/api/theodoi/${id}`, { method: 'DELETE' });
+    await fetch(`/api/theodoi/${id}`, { method: 'DELETE' });
     loadData();
   };
 
@@ -852,7 +891,7 @@ export function TheoDoiHocTap() {
     for (const line of lines) {
       const parts = line.split('|').map(p => p.trim());
       if (parts.length >= 2) {
-        await fetch('http://localhost:5000/api/theodoi', {
+        await fetch('/api/theodoi', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -974,7 +1013,7 @@ export function GiaoDucCaBiet() {
   const [form, setForm] = useState({ ho_ten: '', bieu_hien: '', bien_phap: '', xac_nhan_ph: 'Chưa ký' });
 
   const loadData = () => {
-    fetch('http://localhost:5000/api/cabiet')
+    fetch('/api/cabiet')
       .then(r => r.json())
       .then(data => setList(Array.isArray(data) ? data : []))
       .catch(console.error);
@@ -985,7 +1024,7 @@ export function GiaoDucCaBiet() {
   const handleCreate = async (e) => {
     e.preventDefault();
     if (!form.ho_ten.trim()) return;
-    await fetch('http://localhost:5000/api/cabiet', {
+    await fetch('/api/cabiet', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(form)
@@ -995,7 +1034,7 @@ export function GiaoDucCaBiet() {
   };
 
   const handleUpdate = async (id) => {
-    await fetch(`http://localhost:5000/api/cabiet/${id}`, {
+    await fetch(`/api/cabiet/${id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(editForm)
@@ -1006,7 +1045,7 @@ export function GiaoDucCaBiet() {
 
   const handleDelete = async (id) => {
     if (!window.confirm('Xác nhận xóa hồ sơ theo dõi học sinh này?')) return;
-    await fetch(`http://localhost:5000/api/cabiet/${id}`, { method: 'DELETE' });
+    await fetch(`/api/cabiet/${id}`, { method: 'DELETE' });
     loadData();
   };
 
@@ -1017,7 +1056,7 @@ export function GiaoDucCaBiet() {
     for (const line of lines) {
       const parts = line.split('|').map(p => p.trim());
       if (parts.length >= 1 && parts[0]) {
-        await fetch('http://localhost:5000/api/cabiet', {
+        await fetch('/api/cabiet', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -1150,7 +1189,7 @@ export function SinhHoatLop() {
   });
 
   const loadData = () => {
-    fetch('http://localhost:5000/api/sinhhoat')
+    fetch('/api/sinhhoat')
       .then(r => r.json())
       .then(data => setList(Array.isArray(data) ? data : []))
       .catch(console.error);
@@ -1160,7 +1199,7 @@ export function SinhHoatLop() {
 
   const handleCreate = async (e) => {
     e.preventDefault();
-    await fetch('http://localhost:5000/api/sinhhoat', {
+    await fetch('/api/sinhhoat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(form)
@@ -1170,7 +1209,7 @@ export function SinhHoatLop() {
   };
 
   const handleUpdate = async (id) => {
-    await fetch(`http://localhost:5000/api/sinhhoat/${id}`, {
+    await fetch(`/api/sinhhoat/${id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(editForm)
@@ -1181,7 +1220,7 @@ export function SinhHoatLop() {
 
   const handleDelete = async (id) => {
     if (!window.confirm('Xác nhận xóa biên bản tuần này?')) return;
-    await fetch(`http://localhost:5000/api/sinhhoat/${id}`, { method: 'DELETE' });
+    await fetch(`/api/sinhhoat/${id}`, { method: 'DELETE' });
     loadData();
   };
 
@@ -1192,7 +1231,7 @@ export function SinhHoatLop() {
     for (const line of lines) {
       const parts = line.split('|').map(p => p.trim());
       if (parts.length >= 2) {
-        await fetch('http://localhost:5000/api/sinhhoat', {
+        await fetch('/api/sinhhoat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -1336,7 +1375,7 @@ export function DanhGiaTT22() {
   });
 
   const loadData = () => {
-    fetch('http://localhost:5000/api/tt22')
+    fetch('/api/tt22')
       .then(r => r.json())
       .then(data => setList(Array.isArray(data) ? data : []))
       .catch(console.error);
@@ -1347,7 +1386,7 @@ export function DanhGiaTT22() {
   const handleCreate = async (e) => {
     e.preventDefault();
     if (!form.ho_ten.trim()) return;
-    await fetch('http://localhost:5000/api/tt22', {
+    await fetch('/api/tt22', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(form)
@@ -1357,7 +1396,7 @@ export function DanhGiaTT22() {
   };
 
   const handleUpdate = async (id) => {
-    await fetch(`http://localhost:5000/api/tt22/${id}`, {
+    await fetch(`/api/tt22/${id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(editForm)
@@ -1368,7 +1407,7 @@ export function DanhGiaTT22() {
 
   const handleDelete = async (id) => {
     if (!window.confirm('Xác nhận xóa bản ghi đánh giá này?')) return;
-    await fetch(`http://localhost:5000/api/tt22/${id}`, { method: 'DELETE' });
+    await fetch(`/api/tt22/${id}`, { method: 'DELETE' });
     loadData();
   };
 
@@ -1379,7 +1418,7 @@ export function DanhGiaTT22() {
     for (const line of lines) {
       const parts = line.split('|').map(p => p.trim());
       if (parts.length >= 1 && parts[0]) {
-        await fetch('http://localhost:5000/api/tt22', {
+        await fetch('/api/tt22', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -1516,7 +1555,7 @@ export function ThiDuaLop() {
   const [form, setForm] = useState({ tuan: 1, diem_so: 100, hang_khoi: 1, hang_truong: 1, co_thi_dua: 'Cờ Nhất' });
 
   const loadData = () => {
-    fetch('http://localhost:5000/api/thidua')
+    fetch('/api/thidua')
       .then(r => r.json())
       .then(data => setList(Array.isArray(data) ? data : []))
       .catch(console.error);
@@ -1526,7 +1565,7 @@ export function ThiDuaLop() {
 
   const handleCreate = async (e) => {
     e.preventDefault();
-    await fetch('http://localhost:5000/api/thidua', {
+    await fetch('/api/thidua', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(form)
@@ -1536,7 +1575,7 @@ export function ThiDuaLop() {
   };
 
   const handleUpdate = async (id) => {
-    await fetch(`http://localhost:5000/api/thidua/${id}`, {
+    await fetch(`/api/thidua/${id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(editForm)
@@ -1547,7 +1586,7 @@ export function ThiDuaLop() {
 
   const handleDelete = async (id) => {
     if (!window.confirm('Xác nhận xóa kết quả tuần này?')) return;
-    await fetch(`http://localhost:5000/api/thidua/${id}`, { method: 'DELETE' });
+    await fetch(`/api/thidua/${id}`, { method: 'DELETE' });
     loadData();
   };
 
@@ -1558,7 +1597,7 @@ export function ThiDuaLop() {
     for (const line of lines) {
       const parts = line.split('|').map(p => p.trim());
       if (parts.length >= 2) {
-        await fetch('http://localhost:5000/api/thidua', {
+        await fetch('/api/thidua', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -1683,7 +1722,7 @@ export function BienBanBanGiao({ classData }) {
   });
 
   const loadData = () => {
-    fetch('http://localhost:5000/api/bangiao')
+    fetch('/api/bangiao')
       .then(r => r.json())
       .then(data => setList(Array.isArray(data) ? data : []))
       .catch(console.error);
@@ -1693,7 +1732,7 @@ export function BienBanBanGiao({ classData }) {
 
   const handleCreate = async (e) => {
     e.preventDefault();
-    await fetch('http://localhost:5000/api/bangiao', {
+    await fetch('/api/bangiao', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(form)
@@ -1709,7 +1748,7 @@ export function BienBanBanGiao({ classData }) {
   };
 
   const handleUpdate = async (id) => {
-    await fetch(`http://localhost:5000/api/bangiao/${id}`, {
+    await fetch(`/api/bangiao/${id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(editForm)
@@ -1720,7 +1759,7 @@ export function BienBanBanGiao({ classData }) {
 
   const handleDelete = async (id) => {
     if (!window.confirm('Xác nhận xóa biên bản này?')) return;
-    await fetch(`http://localhost:5000/api/bangiao/${id}`, { method: 'DELETE' });
+    await fetch(`/api/bangiao/${id}`, { method: 'DELETE' });
     loadData();
   };
 
@@ -1731,7 +1770,7 @@ export function BienBanBanGiao({ classData }) {
     for (const line of lines) {
       const parts = line.split('|').map(p => p.trim());
       if (parts.length >= 2) {
-        await fetch('http://localhost:5000/api/bangiao', {
+        await fetch('/api/bangiao', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -1865,7 +1904,7 @@ export function KiemTraBGH() {
   });
 
   const loadData = () => {
-    fetch('http://localhost:5000/api/bgh')
+    fetch('/api/bgh')
       .then(r => r.json())
       .then(data => setList(Array.isArray(data) ? data : []))
       .catch(console.error);
@@ -1875,7 +1914,7 @@ export function KiemTraBGH() {
 
   const handleCreate = async (e) => {
     e.preventDefault();
-    await fetch('http://localhost:5000/api/bgh', {
+    await fetch('/api/bgh', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(form)
@@ -1890,7 +1929,7 @@ export function KiemTraBGH() {
   };
 
   const handleUpdate = async (id) => {
-    await fetch(`http://localhost:5000/api/bgh/${id}`, {
+    await fetch(`/api/bgh/${id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(editForm)
@@ -1901,7 +1940,7 @@ export function KiemTraBGH() {
 
   const handleDelete = async (id) => {
     if (!window.confirm('Xác nhận xóa nhận xét này?')) return;
-    await fetch(`http://localhost:5000/api/bgh/${id}`, { method: 'DELETE' });
+    await fetch(`/api/bgh/${id}`, { method: 'DELETE' });
     loadData();
   };
 
@@ -1912,7 +1951,7 @@ export function KiemTraBGH() {
     for (const line of lines) {
       const parts = line.split('|').map(p => p.trim());
       if (parts.length >= 2) {
-        await fetch('http://localhost:5000/api/bgh', {
+        await fetch('/api/bgh', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({

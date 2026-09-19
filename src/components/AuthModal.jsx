@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { User, Lock, Eye, EyeOff, LogIn, CheckCircle2, AlertTriangle, Mail, Phone, School, KeyRound, ArrowRight } from 'lucide-react';
+import { User, Lock, Eye, EyeOff, LogIn, CheckCircle2, AlertTriangle, Mail, ArrowRight } from 'lucide-react';
+import ThemeToggle from './ThemeToggle';
+import DbHealthBadge from './DbHealthBadge';
 
-export default function AuthModal({ onLoginSuccess, classTitle }) {
+export default function AuthModal({ onLoginSuccess, classTitle, theme = 'dark', onToggleTheme }) {
   const [authView, setAuthView] = useState('login');
   const [loginUsername, setLoginUsername] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
@@ -19,18 +21,37 @@ export default function AuthModal({ onLoginSuccess, classTitle }) {
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
 
-  // Mock DB User nội bộ
-  const [usersDb, setUsersDb] = useState([
-    {
-      username: 'dev',
-      password: '0000',
-      role: 'developer',
-      fullName: 'Quản trị viên Hệ thống',
-      className: 'Phòng Kỹ Thuật',
-      phone: '0900000000',
-      email: 'dev@phucu.edu.vn'
+  // Nạp DB User từ localStorage hoặc mặc định
+  const [usersDb, setUsersDb] = useState(() => {
+    try {
+      const saved = localStorage.getItem('sotay_users_db');
+      if (saved) {
+        return JSON.parse(saved);
+      }
+    } catch (e) {
+      console.error('Không thể đọc users_db:', e);
     }
-  ]);
+    return [
+      {
+        username: 'dev',
+        password: '0000',
+        role: 'developer',
+        fullName: 'Quản trị viên Hệ thống',
+        className: 'Phòng Kỹ Thuật',
+        phone: '0900000000',
+        email: 'dev@phucu.edu.vn'
+      }
+    ];
+  });
+
+  // Lưu usersDb vào localStorage khi có thay đổi
+  useEffect(() => {
+    try {
+      localStorage.setItem('sotay_users_db', JSON.stringify(usersDb));
+    } catch (e) {
+      console.error('Lỗi lưu usersDb:', e);
+    }
+  }, [usersDb]);
 
   useEffect(() => {
     let interval = null;
@@ -108,6 +129,12 @@ export default function AuthModal({ onLoginSuccess, classTitle }) {
           <h2 className="text-sm font-bold tracking-wide text-white uppercase drop-shadow">TRƯỜNG THPT PHÙ CỪ</h2>
           <span className="text-[11px] text-cyan-300 font-mono drop-shadow">Năm học 2026 - 2027</span>
         </div>
+      </div>
+
+      {/* Top right toolbar: DB Status & Theme Toggle */}
+      <div className="absolute top-6 right-6 flex items-center gap-3 z-10">
+        <DbHealthBadge theme={theme} />
+        {onToggleTheme && <ThemeToggle theme={theme} onToggleTheme={onToggleTheme} />}
       </div>
 
       <div className="relative z-10 w-full max-w-lg bg-slate-900 border border-slate-800 p-8 rounded-2xl shadow-2xl shadow-black">

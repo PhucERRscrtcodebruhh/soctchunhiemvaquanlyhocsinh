@@ -7,6 +7,14 @@ export default defineConfig({
     react(),
     tailwindcss(),
   ],
-  base: '/soctchunhiemvaquanlyhocsinh/',
-
+  // Nếu chạy trên Vercel thì lấy '/', nếu build cho GitHub Pages thì lấy sub-path
+  base: process.env.VERCEL ? '/' : '/soctchunhiemvaquanlyhocsinh/',
+  server: {
+    proxy: {
+      '/api': {
+        target: 'http://localhost:5000',
+        changeOrigin: true,
+      },
+    },
+  },
 })

@@ -3,7 +3,7 @@ import { Upload, Download, Plus, Trash2, Edit2, Users, Check, X } from 'lucide-r
 import ModuleContainer from '../../components/ModuleContainer';
 import { parseDocxLines, exportDocxTable } from '../../utils/wordHandler';
 
-const API = 'http://localhost:5000/api/to-hocsinh';
+const API = '/api/to-hocsinh';
 
 export default function SoDoLopHoc() {
   const [students, setStudents] = useState([]);

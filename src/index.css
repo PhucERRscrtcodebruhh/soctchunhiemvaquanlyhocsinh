@@ -1,35 +1,234 @@
 @import "tailwindcss";
 
-/* Tùy chỉnh Scrollbar Dark Theme cho Webkit (Chrome, Edge, Safari, Brave) */
+/* =========================================================
+   DESIGN TOKENS CHO THEME LIGHT / DARK
+   ========================================================= */
+:root {
+  color-scheme: light dark;
+}
+
+html.dark {
+  color-scheme: dark;
+}
+
+html.light {
+  color-scheme: light;
+}
+
+/* =========================================================
+   LIGHT MODE OVERRIDES - GLASSMORPHISM & TƯƠNG PHẢN CAO
+   ========================================================= */
+html.light body {
+  color: #1e293b;
+}
+
+/* Lớp overlay nền trang trong suốt */
+html.light .fixed.inset-0.bg-slate-950\/80 {
+  background-color: rgba(241, 245, 249, 0.88) !important;
+  backdrop-filter: blur(8px);
+}
+
+/* Thẻ Module & Card Container */
+html.light .bg-slate-900 {
+  background-color: rgba(255, 255, 255, 0.95) !important;
+  color: #1e293b !important;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.04) !important;
+}
+
+html.light .bg-slate-950,
+html.light .bg-slate-950\/90,
+html.light .bg-slate-950\/80,
+html.light .bg-slate-950\/60,
+html.light .bg-slate-950\/30 {
+  background-color: rgba(248, 250, 252, 0.92) !important;
+}
+
+html.light .bg-slate-800,
+html.light .bg-slate-800\/95,
+html.light .bg-slate-800\/80,
+html.light .bg-slate-800\/60,
+html.light .bg-slate-800\/40 {
+  background-color: #f1f5f9 !important;
+}
+
+/* Viền phân cách */
+html.light .border-slate-800,
+html.light .border-slate-800\/80,
+html.light .border-slate-700 {
+  border-color: #e2e8f0 !important;
+}
+
+html.light .divide-slate-800 > :not([hidden]) ~ :not([hidden]) {
+  border-color: #e2e8f0 !important;
+}
+
+/* Kiểu chữ tiêu đề và nội dung */
+html.light .text-white:not(button):not(.bg-cyan-500 *):not(.bg-blue-600 *):not(.bg-emerald-600 *):not(.bg-red-500 *):not(.bg-amber-500 *) {
+  color: #0f172a !important;
+}
+
+html.light .text-slate-100 {
+  color: #1e293b !important;
+}
+
+html.light .text-slate-200 {
+  color: #334155 !important;
+}
+
+html.light .text-slate-300 {
+  color: #475569 !important;
+}
+
+html.light .text-slate-400 {
+  color: #64748b !important;
+}
+
+html.light .text-slate-500 {
+  color: #64748b !important;
+}
+
+/* Trang chủ Glassmorphism ở Light Mode */
+html.light header.backdrop-blur-\[2px\],
+html.light div.backdrop-blur-\[2px\] {
+  background-color: rgba(255, 255, 255, 0.85) !important;
+  border-color: rgba(226, 232, 240, 0.8) !important;
+  box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.07) !important;
+}
+
+html.light header.backdrop-blur-\[2px\] h1,
+html.light header.backdrop-blur-\[2px\] span,
+html.light header.backdrop-blur-\[2px\] p,
+html.light div.backdrop-blur-\[2px\] div,
+html.light div.backdrop-blur-\[2px\] span,
+html.light div.backdrop-blur-\[2px\] p {
+  text-shadow: none !important;
+}
+
+html.light header.backdrop-blur-\[2px\] h1 {
+  color: #0f172a !important;
+}
+
+html.light header.backdrop-blur-\[2px\] span {
+  color: #0284c7 !important;
+}
+
+/* Bảng tính & Table */
+html.light table {
+  background-color: #ffffff;
+}
+
+html.light thead,
+html.light thead.bg-slate-800,
+html.light thead.bg-slate-800\/95 {
+  background-color: #f1f5f9 !important;
+  color: #334155 !important;
+  border-bottom: 2px solid #cbd5e1 !important;
+}
+
+html.light thead th {
+  color: #334155 !important;
+  font-weight: 700 !important;
+}
+
+html.light tbody tr:hover,
+html.light tbody tr.hover\:bg-slate-800\/40:hover {
+  background-color: #f8fafc !important;
+}
+
+html.light tbody td {
+  color: #1e293b !important;
+}
+
+/* Ô nhập liệu Form Inputs & Selects */
+html.light input:not([type="checkbox"]):not([type="radio"]),
+html.light select,
+html.light textarea {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+  border-color: #cbd5e1 !important;
+}
+
+html.light input:not([type="checkbox"]):not([type="radio"]):focus,
+html.light select:focus,
+html.light textarea:focus {
+  border-color: #06b6d4 !important;
+  box-shadow: 0 0 0 2px rgba(6, 182, 212, 0.15) !important;
+}
+
+html.light input::placeholder {
+  color: #94a3b8 !important;
+}
+
+/* Khối Thông tư 22 iframe container */
+html.light iframe {
+  background-color: #ffffff !important;
+}
+
+/* Sidebar Light Mode */
+html.light aside {
+  background-color: rgba(255, 255, 255, 0.95) !important;
+  border-color: #e2e8f0 !important;
+  box-shadow: 4px 0 24px rgba(0, 0, 0, 0.04) !important;
+}
+
+html.light aside h2 {
+  color: #0f172a !important;
+}
+
+html.light aside .text-slate-400 {
+  color: #64748b !important;
+}
+
+html.light aside .hover\:bg-slate-900\/60:hover,
+html.light aside .hover\:bg-slate-800:hover {
+  background-color: #f1f5f9 !important;
+  color: #0f172a !important;
+}
+
+/* =========================================================
+   SCROLLBAR - THÍCH ỨNG THEO THEME
+   ========================================================= */
 ::-webkit-scrollbar {
-  width: 6px;               /* Độ mảnh thanh cuộn dọc */
-  height: 6px;              /* Độ mảnh thanh cuộn ngang */
+  width: 6px;
+  height: 6px;
 }
 
-/* Nền đường rãnh trượt (Track) */
-::-webkit-scrollbar-track {
-  background: #020617;      /* Màu slate-950 tiệp với nền web */
+html.dark ::-webkit-scrollbar-track {
+  background: #020617;
 }
 
-/* Con lăn kéo (Thumb) */
-::-webkit-scrollbar-thumb {
-  background: #1e293b;      /* Màu slate-800 */
-  border-radius: 9999px;    /* Bo tròn mềm mại */
+html.dark ::-webkit-scrollbar-thumb {
+  background: #1e293b;
+  border-radius: 9999px;
   border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
-/* Khi rê chuột vào con lăn */
-::-webkit-scrollbar-thumb:hover {
-  background: #334155;      /* Màu slate-700 sáng hơn khi tương tác */
+html.dark ::-webkit-scrollbar-thumb:hover {
+  background: #334155;
 }
 
-/* Khi đang nhấn giữ con lăn */
-::-webkit-scrollbar-thumb:active {
-  background: #06b6d4;      /* Màu cyan-500 ánh sáng nhấn */
+html.light ::-webkit-scrollbar-track {
+  background: #f1f5f9;
 }
 
-/* Hỗ trợ chuẩn trên trình duyệt Firefox */
+html.light ::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 9999px;
+  border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+html.light ::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
 * {
   scrollbar-width: thin;
+}
+
+html.dark * {
   scrollbar-color: #1e293b #020617;
+}
+
+html.light * {
+  scrollbar-color: #cbd5e1 #f1f5f9;
 }

@@ -3,7 +3,7 @@ import { Upload, Download, Plus, Trash2, Edit2, Check, X, Calendar } from 'lucid
 import ModuleContainer from '../../components/ModuleContainer';
 import { parseDocxLines, exportDocxTable } from '../../utils/wordHandler';
 
-const API = 'http://localhost:5000/api/sinhhoat';
+const API = '/api/sinhhoat';
 
 export default function SinhHoatLop() {
   const [list, setList] = useState([]);

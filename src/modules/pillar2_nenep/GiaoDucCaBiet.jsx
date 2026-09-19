@@ -3,7 +3,7 @@ import { Upload, Download, Plus, Trash2, Edit2, Check, X } from 'lucide-react';
 import ModuleContainer from '../../components/ModuleContainer';
 import { parseDocxLines, exportDocxTable } from '../../utils/wordHandler';
 
-const API = 'http://localhost:5000/api/cabiet';
+const API = '/api/cabiet';
 
 export default function GiaoDucCaBiet() {
   const [list, setList] = useState([]);
