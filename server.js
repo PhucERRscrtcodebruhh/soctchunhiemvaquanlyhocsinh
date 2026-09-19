@@ -80,6 +80,94 @@ app.get('/api/logs', async (req, res) => {
 });
 
 // ==========================================
+// 0.1. SƠ YẾU LÝ LỊCH HỌC SINH (CRUD & BATCH)
+// ==========================================
+app.get('/api/soyeulylich', async (req, res) => {
+  try {
+    const [rows] = await pool.query('SELECT * FROM tbl_soyeulylich ORDER BY id ASC');
+    res.json(rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/soyeulylich', async (req, res) => {
+  const { ho_ten, ngay_sinh, gioi_tinh, ho_ten_ph, so_dien_thoai, dia_chi, ghi_chu, to_so, chuc_vu_to } = req.body;
+  try {
+    const [result] = await pool.query(
+      'INSERT INTO tbl_soyeulylich (ho_ten, ngay_sinh, gioi_tinh, ho_ten_ph, so_dien_thoai, dia_chi, ghi_chu, to_so, chuc_vu_to) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [ho_ten, ngay_sinh || '', gioi_tinh || 'Nam', ho_ten_ph || '', so_dien_thoai || '', dia_chi || '', ghi_chu || '', Number(to_so) || 1, chuc_vu_to || 'Thành viên']
+    );
+    await logActivity('SOYEULYLICH_ADD', `Thêm hồ sơ học sinh: ${ho_ten}`);
+    res.json({ id: result.insertId, ...req.body });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/soyeulylich/batch', async (req, res) => {
+  const { students } = req.body;
+  if (!Array.isArray(students) || students.length === 0) {
+    return res.status(400).json({ error: 'Danh sách học sinh không hợp lệ' });
+  }
+  try {
+    const values = students.map(s => [
+      s.ho_ten || '',
+      s.ngay_sinh || '',
+      s.gioi_tinh || 'Nam',
+      s.ho_ten_ph || '',
+      s.so_dien_thoai || '',
+      s.dia_chi || '',
+      s.ghi_chu || '',
+      Number(s.to_so) || 1,
+      s.chuc_vu_to || 'Thành viên'
+    ]);
+    await pool.query(
+      'INSERT INTO tbl_soyeulylich (ho_ten, ngay_sinh, gioi_tinh, ho_ten_ph, so_dien_thoai, dia_chi, ghi_chu, to_so, chuc_vu_to) VALUES ?',
+      [values]
+    );
+    await logActivity('SOYEULYLICH_BATCH', `Nhập ${students.length} học sinh từ file Excel`);
+    res.json({ success: true, count: students.length });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.put('/api/soyeulylich/:id', async (req, res) => {
+  const { ho_ten, ngay_sinh, gioi_tinh, ho_ten_ph, so_dien_thoai, dia_chi, ghi_chu, to_so, chuc_vu_to } = req.body;
+  try {
+    await pool.query(
+      'UPDATE tbl_soyeulylich SET ho_ten=?, ngay_sinh=?, gioi_tinh=?, ho_ten_ph=?, so_dien_thoai=?, dia_chi=?, ghi_chu=?, to_so=?, chuc_vu_to=? WHERE id=?',
+      [ho_ten, ngay_sinh || '', gioi_tinh || 'Nam', ho_ten_ph || '', so_dien_thoai || '', dia_chi || '', ghi_chu || '', Number(to_so) || 1, chuc_vu_to || 'Thành viên', req.params.id]
+    );
+    await logActivity('SOYEULYLICH_UPDATE', `Cập nhật hồ sơ học sinh ID #${req.params.id}: ${ho_ten}`);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/soyeulylich/:id', async (req, res) => {
+  try {
+    await pool.query('DELETE FROM tbl_soyeulylich WHERE id=?', [req.params.id]);
+    await logActivity('SOYEULYLICH_DELETE', `Xóa học sinh ID #${req.params.id}`);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/soyeulylich', async (req, res) => {
+  try {
+    await pool.query('TRUNCATE TABLE tbl_soyeulylich');
+    await logActivity('SOYEULYLICH_CLEAR', 'Xóa toàn bộ danh sách sơ yếu lý lịch học sinh');
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ==========================================
 // 1. BAN ĐẠI DIỆN PHHS (CRUD)
 // ==========================================
 app.get('/api/phuhuynh', async (req, res) => {

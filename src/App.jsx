@@ -100,21 +100,43 @@ export default function App() {
 
   const REGULATION_URL = "https://thuvienphapluat.vn/van-ban/Giao-duc/Thong-tu-22-2021-TT-BGDDT-danh-gia-hoc-sinh-trung-hoc-co-so-485242.aspx";
 
-  // Hàm tải danh sách học sinh thật từ MySQL (/api/to-hocsinh) để đồng bộ sĩ số
+  // Hàm tải danh sách học sinh thật từ MySQL (/api/soyeulylich) để đồng bộ sĩ số toàn bộ hệ thống
   const syncStudentsFromDb = async () => {
     try {
-      const res = await fetch('/api/to-hocsinh');
+      // Ưu tiên đọc từ bảng gốc tbl_soyeulylich
+      const res = await fetch('/api/soyeulylich');
       if (res.ok) {
         const data = await res.json();
-        if (Array.isArray(data)) {
+        if (Array.isArray(data) && data.length > 0) {
           setClassState(prev => ({
             ...prev,
             totalStudents: data.length,
             studentsList: data.map(st => ({
               id: st.id,
               name: st.ho_ten,
-              to_so: st.to_so,
-              chuc_vu: st.chuc_vu_to
+              to_so: st.to_so || 1,
+              chuc_vu: st.chuc_vu_to || 'Thành viên',
+              source: 'soyeulylich'
+            }))
+          }));
+          return;
+        }
+      }
+
+      // Fallback nếu soyeulylich chưa có dữ liệu
+      const res2 = await fetch('/api/to-hocsinh');
+      if (res2.ok) {
+        const data2 = await res2.json();
+        if (Array.isArray(data2)) {
+          setClassState(prev => ({
+            ...prev,
+            totalStudents: data2.length,
+            studentsList: data2.map(st => ({
+              id: st.id,
+              name: st.ho_ten,
+              to_so: st.to_so || 1,
+              chuc_vu: st.chuc_vu_to || 'Thành viên',
+              source: 'to_hocsinh'
             }))
           }));
         }
@@ -363,17 +385,28 @@ export default function App() {
                       const name = prompt('Nhập họ tên học sinh mới:');
                       if (name?.trim()) {
                         try {
-                          const res = await fetch('/api/to-hocsinh', {
+                          const res = await fetch('/api/soyeulylich', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({
                               to_so: 1,
                               ho_ten: name.trim(),
-                              chuc_vu_to: 'Thành viên',
-                              ghi_chu: ''
+                              chuc_vu_to: 'Thành viên'
                             })
                           });
                           if (res.ok) {
+                            syncStudentsFromDb();
+                          } else {
+                            // Fallback to-hocsinh
+                            await fetch('/api/to-hocsinh', {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({
+                                to_so: 1,
+                                ho_ten: name.trim(),
+                                chuc_vu_to: 'Thành viên'
+                              })
+                            });
                             syncStudentsFromDb();
                           }
                         } catch (e) {
@@ -400,7 +433,8 @@ export default function App() {
                           onClick={async () => {
                             if (!window.confirm(`Xóa học sinh ${st.name}?`)) return;
                             try {
-                              const res = await fetch(`/api/to-hocsinh/${st.id}`, { method: 'DELETE' });
+                              const endpoint = st.source === 'soyeulylich' ? `/api/soyeulylich/${st.id}` : `/api/to-hocsinh/${st.id}`;
+                              const res = await fetch(endpoint, { method: 'DELETE' });
                               if (res.ok) {
                                 syncStudentsFromDb();
                               }

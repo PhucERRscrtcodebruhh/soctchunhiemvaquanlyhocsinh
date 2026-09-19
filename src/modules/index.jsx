@@ -4,7 +4,7 @@ import {
   Users, HeartHandshake, UserCheck, School, 
   Calendar, TrendingUp, AlertOctagon, ClipboardList, 
   CheckCircle2, Award, Snowflake, CheckCheck,
-  Upload, Download, Plus, Trash2, Edit2, Check, X
+  Upload, Download, Plus, Trash2, Edit2, Check, X, RefreshCw
 } from 'lucide-react';
 import ModuleContainer from '../components/ModuleContainer';
 import { parseDocxLines, exportDocxTable } from '../utils/wordHandler';
@@ -13,151 +13,424 @@ import { parseDocxLines, exportDocxTable } from '../utils/wordHandler';
 // PHÂN HỆ 1: TỔ CHỨC & HỒ SƠ LỚP (4 MODULES)
 // =========================================================================
 
-// 1. SƠ YẾU LÝ LỊCH HỌC SINH (MODULE DUY NHẤT DÙNG EXCEL)
-export function LyLichHocSinh({ classData }) {
-  const [columns, setColumns] = useState(() => {
-    try {
-      const saved = localStorage.getItem('sotay_lylich_cols');
-      return saved ? JSON.parse(saved) : ['STT', 'Họ và tên', 'Ngày sinh', 'Giới tính', 'Họ tên Cha/Mẹ', 'SĐT'];
-    } catch {
-      return ['STT', 'Họ và tên', 'Ngày sinh', 'Giới tính', 'Họ tên Cha/Mẹ', 'SĐT'];
-    }
+// 1. SƠ YẾU LÝ LỊCH HỌC SINH (KẾT NỐI TRỰC TIẾP MYSQL + EXCEL BATCH)
+export function LyLichHocSinh() {
+  const [students, setStudents] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [fileName, setFileName] = useState('');
+  const [editingId, setEditingId] = useState(null);
+  const [editForm, setEditForm] = useState({});
+  const [form, setForm] = useState({
+    ho_ten: '',
+    ngay_sinh: '',
+    gioi_tinh: 'Nam',
+    ho_ten_ph: '',
+    so_dien_thoai: '',
+    dia_chi: '',
+    to_so: 1,
+    chuc_vu_to: 'Thành viên'
   });
-  const [rows, setRows] = useState(() => {
+
+  const loadData = async () => {
+    setLoading(true);
     try {
-      const saved = localStorage.getItem('sotay_lylich_rows');
-      return saved ? JSON.parse(saved) : [];
-    } catch {
-      return [];
+      const res = await fetch('/api/soyeulylich');
+      if (res.ok) {
+        const data = await res.json();
+        setStudents(Array.isArray(data) ? data : []);
+      }
+    } catch (err) {
+      console.error('Lỗi tải danh sách sơ yếu lý lịch:', err);
+    } finally {
+      setLoading(false);
     }
-  });
-  const [fileName, setFileName] = useState(() => {
-    try {
-      return localStorage.getItem('sotay_lylich_filename') || '';
-    } catch {
-      return '';
-    }
-  });
-  const [newRow, setNewRow] = useState({ name: '', dob: '', gender: 'Nam', parent: '', phone: '' });
+  };
 
   useEffect(() => {
+    loadData();
+  }, []);
+
+  const handleAddStudent = async (e) => {
+    e.preventDefault();
+    if (!form.ho_ten.trim()) return;
     try {
-      localStorage.setItem('sotay_lylich_cols', JSON.stringify(columns));
-      localStorage.setItem('sotay_lylich_rows', JSON.stringify(rows));
-      localStorage.setItem('sotay_lylich_filename', fileName);
-    } catch {}
-  }, [columns, rows, fileName]);
+      const res = await fetch('/api/soyeulylich', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(form)
+      });
+      if (res.ok) {
+        setForm({
+          ho_ten: '',
+          ngay_sinh: '',
+          gioi_tinh: 'Nam',
+          ho_ten_ph: '',
+          so_dien_thoai: '',
+          dia_chi: '',
+          to_so: 1,
+          chuc_vu_to: 'Thành viên'
+        });
+        loadData();
+      }
+    } catch (err) {
+      alert('Lỗi thêm học sinh: ' + err.message);
+    }
+  };
+
+  const handleUpdateStudent = async (id) => {
+    try {
+      const res = await fetch(`/api/soyeulylich/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(editForm)
+      });
+      if (res.ok) {
+        setEditingId(null);
+        loadData();
+      }
+    } catch (err) {
+      alert('Lỗi cập nhật học sinh: ' + err.message);
+    }
+  };
+
+  const handleDeleteStudent = async (id, name) => {
+    if (!window.confirm(`Xác nhận xóa hồ sơ học sinh "${name}" khỏi cơ sở dữ liệu?`)) return;
+    try {
+      const res = await fetch(`/api/soyeulylich/${id}`, { method: 'DELETE' });
+      if (res.ok) {
+        loadData();
+      }
+    } catch (err) {
+      alert('Lỗi xóa học sinh: ' + err.message);
+    }
+  };
+
+  const handleClearAll = async () => {
+    if (!window.confirm('CẢNH BÁO: Thao tác này sẽ XÓA TOÀN BỘ danh sách học sinh trên MySQL server. Bạn có chắc chắn không?')) return;
+    try {
+      const res = await fetch('/api/soyeulylich', { method: 'DELETE' });
+      if (res.ok) {
+        setStudents([]);
+        setFileName('');
+        loadData();
+      }
+    } catch (err) {
+      alert('Lỗi dọn sạch bảng: ' + err.message);
+    }
+  };
 
   const handleFileUpload = (e) => {
     const file = e.target.files[0];
     if (!file) return;
     setFileName(file.name);
     const reader = new FileReader();
-    reader.onload = (evt) => {
-      const bstr = evt.target.result;
-      const workbook = XLSX.read(bstr, { type: 'binary' });
-      const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-      const data = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-      if (data && data.length > 0) {
-        const headers = data[0].filter(h => h !== undefined && h !== null && h !== '');
-        const contentRows = data.slice(1).filter(r => r && r.some(c => c !== undefined && c !== null && c !== ''));
-        setColumns(headers);
-        setRows(contentRows);
+
+    reader.onload = async (evt) => {
+      try {
+        const bstr = evt.target.result;
+        const workbook = XLSX.read(bstr, { type: 'binary' });
+        const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+        const data = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+
+        if (data && data.length > 1) {
+          setLoading(true);
+          const contentRows = data.slice(1).filter(r => r && r.some(c => c !== undefined && c !== null && c !== ''));
+
+          // Phân tích các hàng Excel thành đối tượng học sinh
+          const parsed = contentRows.map(r => {
+            const ho_ten = String(r[1] || r[0] || '').trim();
+            return {
+              ho_ten,
+              ngay_sinh: String(r[2] || '').trim(),
+              gioi_tinh: String(r[3] || 'Nam').trim(),
+              ho_ten_ph: String(r[4] || '').trim(),
+              so_dien_thoai: String(r[5] || '').trim(),
+              dia_chi: String(r[6] || '').trim(),
+              to_so: Number(r[7]) || 1,
+              chuc_vu_to: String(r[8] || 'Thành viên').trim()
+            };
+          }).filter(s => s.ho_ten && s.ho_ten.length > 1 && !s.ho_ten.toLowerCase().includes('họ và tên'));
+
+          if (parsed.length > 0) {
+            const res = await fetch('/api/soyeulylich/batch', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ students: parsed })
+            });
+            if (res.ok) {
+              alert(`Nhập thành công ${parsed.length} học sinh từ file Excel vào MySQL!`);
+              loadData();
+            } else {
+              alert('Máy chủ báo lỗi khi lưu hàng loạt vào MySQL.');
+            }
+          }
+        }
+      } catch (err) {
+        alert('Lỗi đọc file Excel: ' + err.message);
+      } finally {
+        setLoading(false);
       }
     };
+
     reader.readAsBinaryString(file);
     e.target.value = '';
   };
 
-  const handleAddRow = (e) => {
-    e.preventDefault();
-    if (!newRow.name) return;
-    setRows(prev => [...prev, [prev.length + 1, newRow.name, newRow.dob, newRow.gender, newRow.parent, newRow.phone]]);
-    setNewRow({ name: '', dob: '', gender: 'Nam', parent: '', phone: '' });
-  };
-
-  const handleDeleteRow = (index) => {
-    setRows(prev => prev.filter((_, i) => i !== index));
+  const handleExportExcel = () => {
+    if (students.length === 0) return;
+    const worksheetData = [
+      ['STT', 'Họ và tên', 'Ngày sinh', 'Giới tính', 'Họ tên Cha/Mẹ', 'Số điện thoại', 'Địa chỉ', 'Tổ số', 'Chức vụ trong tổ'],
+      ...students.map((s, idx) => [
+        idx + 1,
+        s.ho_ten,
+        s.ngay_sinh,
+        s.gioi_tinh,
+        s.ho_ten_ph,
+        s.so_dien_thoai,
+        s.dia_chi,
+        `Tổ ${s.to_so || 1}`,
+        s.chuc_vu_to || 'Thành viên'
+      ])
+    ];
+    const ws = XLSX.utils.aoa_to_sheet(worksheetData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "DanhSachHocSinh");
+    XLSX.writeFile(wb, "So_Yeu_Ly_Lich_Hoc_Sinh.xlsx");
   };
 
   return (
-    <ModuleContainer title="SƠ YẾU LÝ LỊCH HỌC SINH" desc="Nhập danh sách bằng tệp Excel (.xlsx, .xls) và quản lý hồ sơ học sinh">
+    <ModuleContainer title="SƠ YẾU LÝ LỊCH HỌC SINH" desc="Hồ sơ gốc của học sinh cả lớp • Đồng bộ trực tiếp MySQL • Hỗ trợ Excel (.xlsx, .xls)">
+      {/* THANH CÔNG CỤ NHẬP / XUẤT */}
       <div className="flex flex-wrap items-center justify-between gap-3 p-4 bg-slate-950/60 border border-slate-800 rounded-xl mb-4">
-        <div className="flex items-center gap-3">
-          <label className="cursor-pointer px-4 py-2 bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold rounded-xl text-xs flex items-center gap-2 transition">
+        <div className="flex flex-wrap items-center gap-3">
+          <label className="cursor-pointer px-4 py-2 bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold rounded-xl text-xs flex items-center gap-2 transition shadow-sm">
             <Upload className="w-4 h-4" />
             <span>Tải lên file Excel (.xlsx, .xls)</span>
             <input type="file" accept=".xlsx, .xls" onChange={handleFileUpload} className="hidden" />
           </label>
+
+          <button
+            onClick={handleExportExcel}
+            disabled={students.length === 0}
+            className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 transition"
+          >
+            <Download className="w-3.5 h-3.5" />
+            <span>Xuất Excel (.xlsx)</span>
+          </button>
+
           {fileName && (
             <span className="text-xs text-cyan-400 font-mono">
-              Tệp: <b>{fileName}</b> ({rows.length} hàng)
+              Tệp vừa tải: <b>{fileName}</b>
             </span>
           )}
         </div>
-        {rows.length > 0 && (
-          <button 
-            onClick={() => { 
-              setRows([]); 
-              setFileName(''); 
-              try {
-                localStorage.removeItem('sotay_lylich_cols'); 
-                localStorage.removeItem('sotay_lylich_rows'); 
-                localStorage.removeItem('sotay_lylich_filename'); 
-              } catch {}
-            }} 
-            className="px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-xl text-xs flex items-center gap-1.5 border border-red-500/20 transition"
-          >
-            <Trash2 className="w-3.5 h-3.5" />
-            <span>Xóa bảng</span>
-          </button>
-        )}
+
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-mono font-bold text-slate-400">
+            Sĩ số: <b className="text-cyan-400">{students.length}</b> em
+          </span>
+          {students.length > 0 && (
+            <button 
+              onClick={handleClearAll}
+              className="px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-xl text-xs flex items-center gap-1.5 border border-red-500/20 transition"
+              title="Xóa toàn bộ danh sách khỏi cơ sở dữ liệu"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>Xóa toàn bộ</span>
+            </button>
+          )}
+        </div>
       </div>
 
-      <form onSubmit={handleAddRow} className="grid grid-cols-2 md:grid-cols-6 gap-2 mb-4 bg-slate-800/40 p-3 rounded-xl border border-slate-800">
-        <input placeholder="Họ và tên *" value={newRow.name} onChange={e => setNewRow({ ...newRow, name: e.target.value })} className="px-2.5 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white" required />
-        <input placeholder="Ngày sinh" value={newRow.dob} onChange={e => setNewRow({ ...newRow, dob: e.target.value })} className="px-2.5 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white" />
-        <select value={newRow.gender} onChange={e => setNewRow({ ...newRow, gender: e.target.value })} className="px-2.5 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white">
+      {/* FORM NHẬP NHANH TỪNG HỌC SINH VÀO MYSQL */}
+      <form onSubmit={handleAddStudent} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-8 gap-2 mb-4 bg-slate-800/40 p-3 rounded-xl border border-slate-800">
+        <input 
+          placeholder="Họ và tên *" 
+          value={form.ho_ten} 
+          onChange={e => setForm({ ...form, ho_ten: e.target.value })} 
+          className="lg:col-span-2 px-2.5 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white" 
+          required 
+        />
+        <input 
+          placeholder="Ngày sinh (dd/mm/yyyy)" 
+          value={form.ngay_sinh} 
+          onChange={e => setForm({ ...form, ngay_sinh: e.target.value })} 
+          className="px-2.5 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white" 
+        />
+        <select 
+          value={form.gioi_tinh} 
+          onChange={e => setForm({ ...form, gioi_tinh: e.target.value })} 
+          className="px-2.5 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white"
+        >
           <option value="Nam">Nam</option>
           <option value="Nữ">Nữ</option>
         </select>
-        <input placeholder="Họ tên Cha/Mẹ" value={newRow.parent} onChange={e => setNewRow({ ...newRow, parent: e.target.value })} className="px-2.5 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white" />
-        <input placeholder="Số điện thoại" value={newRow.phone} onChange={e => setNewRow({ ...newRow, phone: e.target.value })} className="px-2.5 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white" />
-        <button type="submit" className="bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold rounded-lg text-xs flex items-center justify-center gap-1">
-          <Plus className="w-3.5 h-3.5" /> Thêm HS
+        <input 
+          placeholder="Họ tên Cha/Mẹ" 
+          value={form.ho_ten_ph} 
+          onChange={e => setForm({ ...form, ho_ten_ph: e.target.value })} 
+          className="px-2.5 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white" 
+        />
+        <input 
+          placeholder="Số điện thoại" 
+          value={form.so_dien_thoai} 
+          onChange={e => setForm({ ...form, so_dien_thoai: e.target.value })} 
+          className="px-2.5 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white" 
+        />
+        <select 
+          value={form.to_so} 
+          onChange={e => setForm({ ...form, to_so: Number(e.target.value) })} 
+          className="px-2.5 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white"
+        >
+          <option value={1}>Tổ 1</option>
+          <option value={2}>Tổ 2</option>
+          <option value={3}>Tổ 3</option>
+          <option value={4}>Tổ 4</option>
+        </select>
+        <button 
+          type="submit" 
+          className="bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold rounded-lg text-xs flex items-center justify-center gap-1 shadow transition"
+        >
+          <Plus className="w-3.5 h-3.5" /> Thêm vào DB
         </button>
       </form>
 
-      {rows.length === 0 ? (
+      {/* HIỂN THỊ DANH SÁCH TỪ MYSQL */}
+      {loading ? (
+        <div className="py-16 text-center text-slate-400 text-xs">
+          Đang tải dữ liệu hồ sơ học sinh từ cơ sở dữ liệu MySQL...
+        </div>
+      ) : students.length === 0 ? (
         <div className="py-16 text-center border border-dashed border-slate-800 rounded-xl bg-slate-950/30">
           <Upload className="w-10 h-10 text-slate-600 mx-auto mb-3" />
-          <p className="text-sm font-semibold text-slate-300">Chưa có dữ liệu danh sách học sinh</p>
-          <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">Tải lên file Excel (.xlsx, .xls) hoặc nhập nhanh ở biểu mẫu trên.</p>
+          <p className="text-sm font-semibold text-slate-300">Chưa có dữ liệu học sinh trong cơ sở dữ liệu</p>
+          <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
+            Tải lên file Excel (.xlsx, .xls) hoặc nhập nhanh ở biểu mẫu trên để lưu trực tiếp vào MySQL.
+          </p>
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-xl border border-slate-800 max-h-[500px] overflow-y-auto">
+        <div className="overflow-x-auto rounded-xl border border-slate-800 max-h-[520px] overflow-y-auto">
           <table className="w-full text-left text-xs text-slate-300 whitespace-nowrap">
             <thead className="bg-slate-800/95 text-slate-400 uppercase text-[10px] tracking-wider sticky top-0 z-10">
               <tr>
                 <th className="p-3 text-center w-12">STT</th>
-                {columns.map((col, idx) => (<th key={idx} className="p-3 font-bold">{col}</th>))}
+                <th className="p-3">Họ và tên</th>
+                <th className="p-3">Ngày sinh</th>
+                <th className="p-3">Giới tính</th>
+                <th className="p-3">Họ tên Cha/Mẹ</th>
+                <th className="p-3">SĐT Liên hệ</th>
+                <th className="p-3">Tổ</th>
                 <th className="p-3 text-right">Thao tác</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800">
-              {rows.map((row, rIdx) => (
-                <tr key={rIdx} className="hover:bg-slate-800/40">
-                  <td className="p-3 text-center text-slate-500 font-mono">{rIdx + 1}</td>
-                  {columns.map((_, cIdx) => (
-                    <td key={cIdx} className="p-3">{row[cIdx] !== undefined && row[cIdx] !== null ? String(row[cIdx]) : '-'}</td>
-                  ))}
-                  <td className="p-3 text-right">
-                    <button onClick={() => handleDeleteRow(rIdx)} className="text-red-400 hover:text-red-300">
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </td>
-                </tr>
-              ))}
+              {students.map((st, idx) => {
+                const isEdit = editingId === st.id;
+                return (
+                  <tr key={st.id} className="hover:bg-slate-800/40 transition">
+                    <td className="p-3 text-center text-slate-500 font-mono">{idx + 1}</td>
+                    {isEdit ? (
+                      <>
+                        <td className="p-2">
+                          <input 
+                            value={editForm.ho_ten || ''} 
+                            onChange={e => setEditForm({ ...editForm, ho_ten: e.target.value })} 
+                            className="w-full px-2 py-1 bg-slate-900 border border-cyan-500/50 rounded text-xs text-white" 
+                          />
+                        </td>
+                        <td className="p-2">
+                          <input 
+                            value={editForm.ngay_sinh || ''} 
+                            onChange={e => setEditForm({ ...editForm, ngay_sinh: e.target.value })} 
+                            className="w-full px-2 py-1 bg-slate-900 border border-cyan-500/50 rounded text-xs text-white" 
+                          />
+                        </td>
+                        <td className="p-2">
+                          <select 
+                            value={editForm.gioi_tinh || 'Nam'} 
+                            onChange={e => setEditForm({ ...editForm, gioi_tinh: e.target.value })} 
+                            className="px-2 py-1 bg-slate-900 border border-cyan-500/50 rounded text-xs text-white"
+                          >
+                            <option value="Nam">Nam</option>
+                            <option value="Nữ">Nữ</option>
+                          </select>
+                        </td>
+                        <td className="p-2">
+                          <input 
+                            value={editForm.ho_ten_ph || ''} 
+                            onChange={e => setEditForm({ ...editForm, ho_ten_ph: e.target.value })} 
+                            className="w-full px-2 py-1 bg-slate-900 border border-cyan-500/50 rounded text-xs text-white" 
+                          />
+                        </td>
+                        <td className="p-2">
+                          <input 
+                            value={editForm.so_dien_thoai || ''} 
+                            onChange={e => setEditForm({ ...editForm, so_dien_thoai: e.target.value })} 
+                            className="w-full px-2 py-1 bg-slate-900 border border-cyan-500/50 rounded text-xs text-white" 
+                          />
+                        </td>
+                        <td className="p-2">
+                          <select 
+                            value={editForm.to_so || 1} 
+                            onChange={e => setEditForm({ ...editForm, to_so: Number(e.target.value) })} 
+                            className="px-2 py-1 bg-slate-900 border border-cyan-500/50 rounded text-xs text-white"
+                          >
+                            <option value={1}>Tổ 1</option>
+                            <option value={2}>Tổ 2</option>
+                            <option value={3}>Tổ 3</option>
+                            <option value={4}>Tổ 4</option>
+                          </select>
+                        </td>
+                        <td className="p-2 text-right">
+                          <div className="flex justify-end gap-1">
+                            <button onClick={() => handleUpdateStudent(st.id)} className="p-1 bg-emerald-600 text-white rounded">
+                              <Check className="w-3.5 h-3.5" />
+                            </button>
+                            <button onClick={() => setEditingId(null)} className="p-1 bg-slate-700 text-slate-300 rounded">
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </td>
+                      </>
+                    ) : (
+                      <>
+                        <td className="p-3 font-semibold text-white">{st.ho_ten}</td>
+                        <td className="p-3 text-slate-400">{st.ngay_sinh || '-'}</td>
+                        <td className="p-3">
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${st.gioi_tinh === 'Nữ' ? 'bg-pink-500/15 text-pink-400' : 'bg-cyan-500/15 text-cyan-400'}`}>
+                            {st.gioi_tinh || 'Nam'}
+                          </span>
+                        </td>
+                        <td className="p-3">{st.ho_ten_ph || '-'}</td>
+                        <td className="p-3 font-mono text-slate-400">{st.so_dien_thoai || '-'}</td>
+                        <td className="p-3">
+                          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/10 text-amber-400">
+                            Tổ {st.to_so || 1}
+                          </span>
+                        </td>
+                        <td className="p-3 text-right">
+                          <div className="flex justify-end gap-2">
+                            <button 
+                              onClick={() => { setEditingId(st.id); setEditForm(st); }} 
+                              className="text-cyan-400 hover:text-cyan-300"
+                              title="Sửa thông tin"
+                            >
+                              <Edit2 className="w-3.5 h-3.5" />
+                            </button>
+                            <button 
+                              onClick={() => handleDeleteStudent(st.id, st.ho_ten)} 
+                              className="text-red-400 hover:text-red-300"
+                              title="Xóa học sinh"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </td>
+                      </>
+                    )}
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -508,7 +781,7 @@ export function CanBoLopDoan() {
   );
 }
 
-// 4. SƠ ĐỒ LỚP HỌC & CHIA TỔ (WORD .DOCX + CRUD HỌC SINH THEO TỔ)
+// 4. SƠ ĐỒ LỚP HỌC & CHIA TỔ (DÙNG CHUNG BẢNG HỌC SINH VỚI SƠ YẾU LÝ LỊCH)
 export function SoDoLopHoc() {
   const [students, setStudents] = useState([]);
   const [toSo, setToSo] = useState(1);
@@ -517,11 +790,25 @@ export function SoDoLopHoc() {
   const [editingId, setEditingId] = useState(null);
   const [editForm, setEditForm] = useState({});
 
-  const loadData = () => {
-    fetch('/api/to-hocsinh')
-      .then(r => r.json())
-      .then(data => setStudents(Array.isArray(data) ? data : []))
-      .catch(console.error);
+  const loadData = async () => {
+    try {
+      const res = await fetch('/api/soyeulylich');
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data) && data.length > 0) {
+          setStudents(data);
+          return;
+        }
+      }
+      // Fallback nếu soyeulylich rỗng
+      const res2 = await fetch('/api/to-hocsinh');
+      if (res2.ok) {
+        const data2 = await res2.json();
+        setStudents(Array.isArray(data2) ? data2 : []);
+      }
+    } catch (e) {
+      console.error('Lỗi tải danh sách chia tổ:', e);
+    }
   };
 
   useEffect(() => { loadData(); }, []);
@@ -529,29 +816,41 @@ export function SoDoLopHoc() {
   const handleAddHS = async (e) => {
     e.preventDefault();
     if (!hoTen.trim()) return;
-    await fetch('/api/to-hocsinh', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ to_so: toSo, ho_ten: hoTen.trim(), chuc_vu_to: chucVu })
-    });
-    setHoTen('');
-    loadData();
+    try {
+      await fetch('/api/soyeulylich', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ho_ten: hoTen.trim(), to_so: toSo, chuc_vu_to: chucVu })
+      });
+      setHoTen('');
+      loadData();
+    } catch (err) {
+      alert('Lỗi thêm học sinh vào tổ: ' + err.message);
+    }
   };
 
   const handleUpdateHS = async (id) => {
-    await fetch(`/api/to-hocsinh/${id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(editForm)
-    });
-    setEditingId(null);
-    loadData();
+    try {
+      await fetch(`/api/soyeulylich/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(editForm)
+      });
+      setEditingId(null);
+      loadData();
+    } catch (err) {
+      alert('Lỗi cập nhật tổ: ' + err.message);
+    }
   };
 
   const handleDeleteHS = async (id) => {
-    if (!window.confirm('Xác nhận xóa học sinh khỏi tổ?')) return;
-    await fetch(`/api/to-hocsinh/${id}`, { method: 'DELETE' });
-    loadData();
+    if (!window.confirm('Xác nhận xóa học sinh này khỏi danh sách?')) return;
+    try {
+      await fetch(`/api/soyeulylich/${id}`, { method: 'DELETE' });
+      loadData();
+    } catch (err) {
+      alert('Lỗi xóa học sinh: ' + err.message);
+    }
   };
 
   const handleImportWord = async (e) => {
@@ -561,7 +860,7 @@ export function SoDoLopHoc() {
     for (const line of lines) {
       const parts = line.split('|').map(p => p.trim());
       if (parts.length >= 2) {
-        await fetch('/api/to-hocsinh', {
+        await fetch('/api/soyeulylich', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -581,13 +880,13 @@ export function SoDoLopHoc() {
     exportDocxTable({
       title: 'DANH SÁCH HỌC SINH THEO TỔ',
       headers: ['STT', 'Tổ số', 'Họ và tên học sinh', 'Chức vụ trong tổ', 'Ghi chú'],
-      rows: students.map((it, idx) => [idx + 1, `Tổ ${it.to_so}`, it.ho_ten, it.chuc_vu_to, it.ghi_chu || '']),
+      rows: students.map((it, idx) => [idx + 1, `Tổ ${it.to_so || 1}`, it.ho_ten, it.chuc_vu_to || 'Thành viên', it.ghi_chu || '']),
       filename: 'Danh_Sach_Chia_To'
     });
   };
 
   return (
-    <ModuleContainer title="DANH SÁCH CHIA TỔ & SƠ ĐỒ LỚP" desc="Quản lý học sinh theo từng tổ (Nhập / Xuất Word .docx)">
+    <ModuleContainer title="DANH SÁCH CHIA TỔ & SƠ ĐỒ LỚP" desc="Quản lý chia tổ lớp học • Đồng bộ chung với Sơ yếu lý lịch • Hỗ trợ Word .docx">
       <div className="flex flex-wrap items-center justify-between gap-3 p-4 bg-slate-950/60 border border-slate-800 rounded-xl mb-4">
         <div className="flex gap-2">
           <label className="cursor-pointer px-3.5 py-2 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 transition">
@@ -600,13 +899,26 @@ export function SoDoLopHoc() {
             <span>Xuất Word (.docx)</span>
           </button>
         </div>
+        <span className="text-xs font-mono font-bold text-slate-400">
+          Tổng số: <b className="text-cyan-400">{students.length}</b> HS trong các tổ
+        </span>
       </div>
 
       <form onSubmit={handleAddHS} className="flex flex-wrap gap-2 mb-6 bg-slate-800/40 p-3 rounded-xl border border-slate-800">
         <select value={toSo} onChange={e => setToSo(Number(e.target.value))} className="px-2.5 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white">
           {[1, 2, 3, 4].map(t => <option key={t} value={t}>Tổ {t}</option>)}
         </select>
-        <input placeholder="Họ và tên học sinh *" value={hoTen} onChange={e => setHoTen(e.target.value)} className="flex-1 min-w-[180px] px-2.5 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white" required />
+        <input 
+          list="so-do-datalist"
+          placeholder="Họ và tên học sinh (nhập hoặc chọn danh sách) *" 
+          value={hoTen} 
+          onChange={e => setHoTen(e.target.value)} 
+          className="flex-1 min-w-[200px] px-2.5 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white" 
+          required 
+        />
+        <datalist id="so-do-datalist">
+          {students.map(s => <option key={s.id} value={s.ho_ten} />)}
+        </datalist>
         <input placeholder="Chức vụ (Tổ trưởng/Tổ phó/Thành viên)" value={chucVu} onChange={e => setChucVu(e.target.value)} className="w-48 px-2.5 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white" />
         <button type="submit" className="px-4 py-1.5 bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold rounded-lg text-xs flex items-center gap-1">
           <Plus className="w-3.5 h-3.5" /> Thêm vào tổ
@@ -837,6 +1149,7 @@ export function ThoiKhoaBieu() {
 // 6. THEO DÕI HỌC TẬP & RÈN LUYỆN (WORD .DOCX + CRUD)
 export function TheoDoiHocTap() {
   const [list, setList] = useState([]);
+  const [studentOptions, setStudentOptions] = useState([]);
   const [editingId, setEditingId] = useState(null);
   const [editForm, setEditForm] = useState({});
   const [form, setForm] = useState({
@@ -852,6 +1165,11 @@ export function TheoDoiHocTap() {
       .then(r => r.json())
       .then(data => setList(Array.isArray(data) ? data : []))
       .catch(console.error);
+
+    fetch('/api/soyeulylich')
+      .then(r => r.json())
+      .then(data => { if (Array.isArray(data)) setStudentOptions(data); })
+      .catch(() => {});
   };
 
   useEffect(() => { loadData(); }, []);
@@ -935,7 +1253,17 @@ export function TheoDoiHocTap() {
 
       <form onSubmit={handleCreate} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-2 mb-4 bg-slate-800/40 p-3 rounded-xl border border-slate-800">
         <input type="date" value={form.ngay_thang} onChange={e => setForm({ ...form, ngay_thang: e.target.value })} className="px-2.5 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white" required />
-        <input placeholder="Họ và tên *" value={form.ho_ten} onChange={e => setForm({ ...form, ho_ten: e.target.value })} className="px-2.5 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white" required />
+        <input 
+          list="theodoi-students-list"
+          placeholder="Họ và tên *" 
+          value={form.ho_ten} 
+          onChange={e => setForm({ ...form, ho_ten: e.target.value })} 
+          className="px-2.5 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white" 
+          required 
+        />
+        <datalist id="theodoi-students-list">
+          {studentOptions.map(s => <option key={s.id} value={s.ho_ten} />)}
+        </datalist>
         <input placeholder="Môn học" value={form.mon_hoc} onChange={e => setForm({ ...form, mon_hoc: e.target.value })} className="px-2.5 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white" />
         <input placeholder="Điểm / Nhận xét" value={form.diem_nhan_xet} onChange={e => setForm({ ...form, diem_nhan_xet: e.target.value })} className="px-2.5 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white" />
         <input placeholder="Vi phạm / Khen thưởng" value={form.vi_pham_khen_thuong} onChange={e => setForm({ ...form, vi_pham_khen_thuong: e.target.value })} className="px-2.5 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white" />
@@ -966,7 +1294,7 @@ export function TheoDoiHocTap() {
                   {isEdit ? (
                     <>
                       <td className="p-2"><input type="date" value={editForm.ngay_thang ? String(editForm.ngay_thang).slice(0, 10) : ''} onChange={e => setEditForm({ ...editForm, ngay_thang: e.target.value })} className="px-2 py-1 bg-slate-900 border border-cyan-500/50 rounded text-xs text-white" /></td>
-                      <td className="p-2"><input value={editForm.ho_ten || ''} onChange={e => setEditForm({ ...editForm, ho_ten: e.target.value })} className="w-full px-2 py-1 bg-slate-900 border border-cyan-500/50 rounded text-xs text-white" /></td>
+                      <td className="p-2"><input list="theodoi-students-list" value={editForm.ho_ten || ''} onChange={e => setEditForm({ ...editForm, ho_ten: e.target.value })} className="w-full px-2 py-1 bg-slate-900 border border-cyan-500/50 rounded text-xs text-white" /></td>
                       <td className="p-2"><input value={editForm.mon_hoc || ''} onChange={e => setEditForm({ ...editForm, mon_hoc: e.target.value })} className="w-full px-2 py-1 bg-slate-900 border border-cyan-500/50 rounded text-xs text-white" /></td>
                       <td className="p-2"><input value={editForm.diem_nhan_xet || ''} onChange={e => setEditForm({ ...editForm, diem_nhan_xet: e.target.value })} className="w-full px-2 py-1 bg-slate-900 border border-cyan-500/50 rounded text-xs text-white" /></td>
                       <td className="p-2"><input value={editForm.vi_pham_khen_thuong || ''} onChange={e => setEditForm({ ...editForm, vi_pham_khen_thuong: e.target.value })} className="w-full px-2 py-1 bg-slate-900 border border-cyan-500/50 rounded text-xs text-white" /></td>
@@ -1008,6 +1336,7 @@ export function TheoDoiHocTap() {
 // 7. GIÁO DỤC HỌC SINH CÁ BIỆT (WORD .DOCX + CRUD)
 export function GiaoDucCaBiet() {
   const [list, setList] = useState([]);
+  const [studentOptions, setStudentOptions] = useState([]);
   const [editingId, setEditingId] = useState(null);
   const [editForm, setEditForm] = useState({});
   const [form, setForm] = useState({ ho_ten: '', bieu_hien: '', bien_phap: '', xac_nhan_ph: 'Chưa ký' });
@@ -1017,6 +1346,11 @@ export function GiaoDucCaBiet() {
       .then(r => r.json())
       .then(data => setList(Array.isArray(data) ? data : []))
       .catch(console.error);
+
+    fetch('/api/soyeulylich')
+      .then(r => r.json())
+      .then(data => { if (Array.isArray(data)) setStudentOptions(data); })
+      .catch(() => {});
   };
 
   useEffect(() => { loadData(); }, []);
@@ -1098,7 +1432,17 @@ export function GiaoDucCaBiet() {
       </div>
 
       <form onSubmit={handleCreate} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2 mb-4 bg-slate-800/40 p-3 rounded-xl border border-slate-800">
-        <input placeholder="Họ và tên học sinh *" value={form.ho_ten} onChange={e => setForm({ ...form, ho_ten: e.target.value })} className="px-2.5 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white" required />
+        <input 
+          list="cabiet-students-list"
+          placeholder="Họ và tên học sinh *" 
+          value={form.ho_ten} 
+          onChange={e => setForm({ ...form, ho_ten: e.target.value })} 
+          className="px-2.5 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white" 
+          required 
+        />
+        <datalist id="cabiet-students-list">
+          {studentOptions.map(s => <option key={s.id} value={s.ho_ten} />)}
+        </datalist>
         <input placeholder="Biểu hiện vi phạm" value={form.bieu_hien} onChange={e => setForm({ ...form, bieu_hien: e.target.value })} className="px-2.5 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white" />
         <input placeholder="Biện pháp GVCN" value={form.bien_phap} onChange={e => setForm({ ...form, bien_phap: e.target.value })} className="px-2.5 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white" />
         <select value={form.xac_nhan_ph} onChange={e => setForm({ ...form, xac_nhan_ph: e.target.value })} className="px-2.5 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white">
@@ -1131,7 +1475,7 @@ export function GiaoDucCaBiet() {
                   <td className="p-3 text-center text-slate-500 font-mono">{idx + 1}</td>
                   {isEdit ? (
                     <>
-                      <td className="p-2"><input value={editForm.ho_ten || ''} onChange={e => setEditForm({ ...editForm, ho_ten: e.target.value })} className="w-full px-2 py-1 bg-slate-900 border border-cyan-500/50 rounded text-xs text-white" /></td>
+                      <td className="p-2"><input list="cabiet-students-list" value={editForm.ho_ten || ''} onChange={e => setEditForm({ ...editForm, ho_ten: e.target.value })} className="w-full px-2 py-1 bg-slate-900 border border-cyan-500/50 rounded text-xs text-white" /></td>
                       <td className="p-2"><input value={editForm.bieu_hien || ''} onChange={e => setEditForm({ ...editForm, bieu_hien: e.target.value })} className="w-full px-2 py-1 bg-slate-900 border border-cyan-500/50 rounded text-xs text-white" /></td>
                       <td className="p-2"><input value={editForm.bien_phap || ''} onChange={e => setEditForm({ ...editForm, bien_phap: e.target.value })} className="w-full px-2 py-1 bg-slate-900 border border-cyan-500/50 rounded text-xs text-white" /></td>
                       <td className="p-2">
@@ -1361,9 +1705,11 @@ export function SinhHoatLop() {
 // PHÂN HỆ 3: ĐÁNH GIÁ & KIỂM ĐỊNH (4 MODULES)
 // =========================================================================
 
-// 9. TỔNG HỢP XẾP LOẠI THEO THÔNG TƯ 22 (WORD .DOCX + CRUD)
+// 9. TỔNG HỢP XẾP LOẠI THEO THÔNG TƯ 22 (WORD .DOCX + CRUD + ĐỒNG BỘ HS GỐC)
 export function DanhGiaTT22() {
   const [list, setList] = useState([]);
+  const [studentOptions, setStudentOptions] = useState([]);
+  const [syncing, setSyncing] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [editForm, setEditForm] = useState({});
   const [form, setForm] = useState({
@@ -1379,9 +1725,56 @@ export function DanhGiaTT22() {
       .then(r => r.json())
       .then(data => setList(Array.isArray(data) ? data : []))
       .catch(console.error);
+
+    fetch('/api/soyeulylich')
+      .then(r => r.json())
+      .then(data => { if (Array.isArray(data)) setStudentOptions(data); })
+      .catch(() => {});
   };
 
   useEffect(() => { loadData(); }, []);
+
+  const handleSyncFromLyLich = async () => {
+    try {
+      setSyncing(true);
+      const res = await fetch('/api/soyeulylich');
+      const allStudents = await res.json();
+      if (!Array.isArray(allStudents) || allStudents.length === 0) {
+        alert('Chưa có học sinh nào trong Sơ yếu lý lịch để đồng bộ! Vui lòng nhập hoặc tải file Excel ở module Sơ yếu lý lịch trước.');
+        setSyncing(false);
+        return;
+      }
+      
+      const existingNames = new Set(list.map(it => (it.ho_ten || '').trim().toLowerCase()));
+      const toAdd = allStudents.filter(s => s.ho_ten && !existingNames.has(s.ho_ten.trim().toLowerCase()));
+      
+      if (toAdd.length === 0) {
+        alert(`Tất cả ${allStudents.length} học sinh trong Sơ yếu lý lịch đã có đầy đủ trong bảng Đánh giá TT22!`);
+        setSyncing(false);
+        return;
+      }
+
+      for (const s of toAdd) {
+        await fetch('/api/tt22', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            ho_ten: s.ho_ten,
+            hk1_ht: 'Tốt',
+            hk1_rl: 'Tốt',
+            cn_ht: 'Tốt',
+            danh_hieu: 'Học sinh Tiên tiến'
+          })
+        });
+      }
+      alert(`Đã đồng bộ thành công ${toAdd.length} học sinh từ Sơ yếu lý lịch vào bảng Đánh giá TT22!`);
+      loadData();
+    } catch (err) {
+      alert('Lỗi đồng bộ: ' + err.message);
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   const handleCreate = async (e) => {
     e.preventDefault();
@@ -1445,9 +1838,18 @@ export function DanhGiaTT22() {
   };
 
   return (
-    <ModuleContainer title="TỔNG HỢP XẾP LOẠI HỌC SINH THEO THÔNG TƯ 22" desc="Đánh giá kết quả Rèn luyện và Học tập (Nhập / Xuất Word .docx)">
+    <ModuleContainer title="TỔNG HỢP XẾP LOẠI HỌC SINH THEO THÔNG TƯ 22" desc="Đánh giá kết quả Rèn luyện và Học tập • Tự động đồng bộ từ Sơ yếu lý lịch • Hỗ trợ Word .docx">
       <div className="flex flex-wrap items-center justify-between gap-3 p-4 bg-slate-950/60 border border-slate-800 rounded-xl mb-4">
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
+          <button 
+            onClick={handleSyncFromLyLich}
+            disabled={syncing}
+            className="px-3.5 py-2 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 disabled:opacity-50 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 transition shadow-sm"
+            title="Tự động lấy toàn bộ danh sách học sinh từ Sơ yếu lý lịch vào bảng đánh giá"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${syncing ? 'animate-spin' : ''}`} />
+            <span>{syncing ? 'Đang đồng bộ...' : 'Đồng bộ toàn bộ HS từ Sơ yếu lý lịch'}</span>
+          </button>
           <label className="cursor-pointer px-3.5 py-2 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 transition">
             <Upload className="w-3.5 h-3.5" />
             <span>Nhập Word (.docx)</span>
@@ -1458,10 +1860,23 @@ export function DanhGiaTT22() {
             <span>Xuất Word (.docx)</span>
           </button>
         </div>
+        <span className="text-xs font-mono font-bold text-slate-400">
+          Đã đánh giá: <b className="text-cyan-400">{list.length}</b> HS
+        </span>
       </div>
 
       <form onSubmit={handleCreate} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-2 mb-4 bg-slate-800/40 p-3 rounded-xl border border-slate-800">
-        <input placeholder="Họ và tên học sinh *" value={form.ho_ten} onChange={e => setForm({ ...form, ho_ten: e.target.value })} className="px-2.5 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white" required />
+        <input 
+          list="tt22-students-list"
+          placeholder="Họ và tên học sinh *" 
+          value={form.ho_ten} 
+          onChange={e => setForm({ ...form, ho_ten: e.target.value })} 
+          className="px-2.5 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white" 
+          required 
+        />
+        <datalist id="tt22-students-list">
+          {studentOptions.map(s => <option key={s.id} value={s.ho_ten} />)}
+        </datalist>
         <select value={form.hk1_ht} onChange={e => setForm({ ...form, hk1_ht: e.target.value })} className="px-2 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white">
           <option value="Tốt">HT HK1: Tốt</option>
           <option value="Khá">HT HK1: Khá</option>
@@ -1507,7 +1922,7 @@ export function DanhGiaTT22() {
                   <td className="p-3 text-center text-slate-500 font-mono">{idx + 1}</td>
                   {isEdit ? (
                     <>
-                      <td className="p-2"><input value={editForm.ho_ten || ''} onChange={e => setEditForm({ ...editForm, ho_ten: e.target.value })} className="w-full px-2 py-1 bg-slate-900 border border-cyan-500/50 rounded text-xs text-white" /></td>
+                      <td className="p-2"><input list="tt22-students-list" value={editForm.ho_ten || ''} onChange={e => setEditForm({ ...editForm, ho_ten: e.target.value })} className="w-full px-2 py-1 bg-slate-900 border border-cyan-500/50 rounded text-xs text-white" /></td>
                       <td className="p-2"><input value={editForm.hk1_ht || ''} onChange={e => setEditForm({ ...editForm, hk1_ht: e.target.value })} className="w-full px-2 py-1 bg-slate-900 border border-cyan-500/50 rounded text-xs text-white" /></td>
                       <td className="p-2"><input value={editForm.hk1_rl || ''} onChange={e => setEditForm({ ...editForm, hk1_rl: e.target.value })} className="w-full px-2 py-1 bg-slate-900 border border-cyan-500/50 rounded text-xs text-white" /></td>
                       <td className="p-2"><input value={editForm.cn_ht || ''} onChange={e => setEditForm({ ...editForm, cn_ht: e.target.value })} className="w-full px-2 py-1 bg-slate-900 border border-cyan-500/50 rounded text-xs text-white" /></td>
