@@ -53,6 +53,31 @@ const initDocumentsTable = async () => {
 };
 initDocumentsTable();
 
+// Migration an toàn: Bổ sung cột document_content LONGTEXT vào 11 bảng hiện có (TUYỆT ĐỐI KHÔNG TẠO BẢNG MỚI)
+const runModuleMigrations = async () => {
+  const tables = [
+    'tbl_phuhuynh',
+    'tbl_canbo',
+    'tbl_to_hocsinh',
+    'tbl_thoikhoabieu',
+    'tbl_theodoi',
+    'tbl_cabiet',
+    'tbl_sinhhoat',
+    'tbl_danhgia_tt22',
+    'tbl_thidua',
+    'tbl_bangiao',
+    'tbl_kiemtra_bgh'
+  ];
+  for (const t of tables) {
+    try {
+      await pool.query(`ALTER TABLE ${t} ADD COLUMN IF NOT EXISTS document_content LONGTEXT`);
+    } catch (e) {
+      console.warn(`Migration note on ${t}:`, e.message);
+    }
+  }
+};
+runModuleMigrations();
+
 // Hàm ghi log vào DB
 const logActivity = async (action, details) => {
   try {
@@ -153,6 +178,47 @@ app.post('/api/soyeulylich/batch', async (req, res) => {
     res.json({ success: true, count: students.length });
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/soyeulylich/sync', async (req, res) => {
+  const { students, ma_lop } = req.body;
+  const lop = ma_lop || '10A1';
+  if (!Array.isArray(students)) {
+    return res.status(400).json({ error: 'Danh sách học sinh không hợp lệ' });
+  }
+  const connection = await pool.getConnection();
+  try {
+    await connection.beginTransaction();
+    // Xóa danh sách cũ của lớp này để cập nhật toàn diện danh sách mới từ bảng tính
+    await connection.query('DELETE FROM tbl_soyeulylich WHERE ma_lop = ?', [lop]);
+    
+    if (students.length > 0) {
+      const values = students.map(s => [
+        s.ho_ten || '',
+        s.ngay_sinh || '',
+        s.gioi_tinh || 'Nam',
+        s.ho_ten_ph || '',
+        s.so_dien_thoai || '',
+        s.dia_chi || '',
+        s.ghi_chu || '',
+        Number(s.to_so) || 1,
+        s.chuc_vu_to || 'Thành viên',
+        lop
+      ]);
+      await connection.query(
+        'INSERT INTO tbl_soyeulylich (ho_ten, ngay_sinh, gioi_tinh, ho_ten_ph, so_dien_thoai, dia_chi, ghi_chu, to_so, chuc_vu_to, ma_lop) VALUES ?',
+        [values]
+      );
+    }
+    await connection.commit();
+    await logActivity('SOYEULYLICH_SYNC', `Đồng bộ ${students.length} học sinh từ bảng tính Excel cho lớp ${lop}`);
+    res.json({ success: true, count: students.length });
+  } catch (err) {
+    await connection.rollback();
+    res.status(500).json({ error: err.message });
+  } finally {
+    connection.release();
   }
 });
 
@@ -798,6 +864,119 @@ app.delete('/api/documents/:id', async (req, res) => {
     await pool.query('DELETE FROM tbl_saved_documents WHERE id = ?', [req.params.id]);
     await logActivity('DOC_DELETE', `Xóa tệp lưu trữ ID #${req.params.id}`);
     res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ==========================================
+// 13. LƯU TRỮ VĂN BẢN WORD TỪNG PHÂN HỆ (MODULES DOCUMENT PERSISTENCE)
+// ==========================================
+app.get('/api/modules/document', async (req, res) => {
+  const { moduleId, ma_lop } = req.query;
+  const lop = ma_lop || '10A1';
+  if (!moduleId) return res.status(400).json({ error: 'Thiếu moduleId' });
+
+  try {
+    // 1. Kiểm tra trong tbl_saved_documents (lưu trữ docx/html theo key module_{moduleId}_{lop})
+    const docKey = `Module_${moduleId}_${lop}`;
+    const [saved] = await pool.query(
+      'SELECT file_data, updated_at FROM tbl_saved_documents WHERE file_name = ? AND ma_lop = ? ORDER BY id DESC LIMIT 1',
+      [docKey, lop]
+    );
+    if (saved.length > 0 && saved[0].file_data) {
+      return res.json({ content: saved[0].file_data, updated_at: saved[0].updated_at, source: 'saved_documents' });
+    }
+
+    // 2. Kiểm tra trong bảng tương ứng của module nếu có column document_content
+    const tableMap = {
+      phuhuynh: 'tbl_phuhuynh',
+      canbo: 'tbl_canbo',
+      sodo: 'tbl_to_hocsinh',
+      tkb: 'tbl_thoikhoabieu',
+      theodoi: 'tbl_theodoi',
+      cabiet: 'tbl_cabiet',
+      sinhhoat: 'tbl_sinhhoat',
+      tt22: 'tbl_danhgia_tt22',
+      thidua: 'tbl_thidua',
+      bangiao: 'tbl_bangiao',
+      bgh: 'tbl_kiemtra_bgh'
+    };
+    const targetTable = tableMap[moduleId];
+    if (targetTable) {
+      try {
+        const [rows] = await pool.query(
+          `SELECT document_content, created_at FROM ${targetTable} WHERE ma_lop = ? AND document_content IS NOT NULL AND document_content != '' ORDER BY id DESC LIMIT 1`,
+          [lop]
+        );
+        if (rows.length > 0 && rows[0].document_content) {
+          return res.json({ content: rows[0].document_content, updated_at: rows[0].created_at, source: targetTable });
+        }
+      } catch (e) {
+        // Table query fallback
+      }
+    }
+
+    res.json({ content: null });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/modules/document', async (req, res) => {
+  const { moduleId, ma_lop, document_content, docx_base64 } = req.body;
+  const lop = ma_lop || '10A1';
+  if (!moduleId || !document_content) {
+    return res.status(400).json({ error: 'Thiếu moduleId hoặc document_content' });
+  }
+
+  try {
+    const docKey = `Module_${moduleId}_${lop}`;
+    // 1. Lưu nội dung HTML / văn bản vào tbl_saved_documents
+    const [existing] = await pool.query(
+      'SELECT id FROM tbl_saved_documents WHERE file_name = ? AND ma_lop = ?',
+      [docKey, lop]
+    );
+    if (existing.length > 0) {
+      await pool.query(
+        'UPDATE tbl_saved_documents SET file_data = ?, updated_at = NOW() WHERE id = ?',
+        [document_content, existing[0].id]
+      );
+    } else {
+      await pool.query(
+        'INSERT INTO tbl_saved_documents (file_name, file_type, file_data, ma_lop, updated_at) VALUES (?, ?, ?, ?, NOW())',
+        [docKey, 'word_module', document_content, lop]
+      );
+    }
+
+    // 2. Cập nhật document_content vào bảng tương ứng của module
+    const tableMap = {
+      phuhuynh: 'tbl_phuhuynh',
+      canbo: 'tbl_canbo',
+      sodo: 'tbl_to_hocsinh',
+      tkb: 'tbl_thoikhoabieu',
+      theodoi: 'tbl_theodoi',
+      cabiet: 'tbl_cabiet',
+      sinhhoat: 'tbl_sinhhoat',
+      tt22: 'tbl_danhgia_tt22',
+      thidua: 'tbl_thidua',
+      bangiao: 'tbl_bangiao',
+      bgh: 'tbl_kiemtra_bgh'
+    };
+    const targetTable = tableMap[moduleId];
+    if (targetTable) {
+      try {
+        await pool.query(
+          `UPDATE ${targetTable} SET document_content = ? WHERE ma_lop = ?`,
+          [document_content, lop]
+        );
+      } catch (e) {
+        console.warn(`Lưu document_content vào ${targetTable}:`, e.message);
+      }
+    }
+
+    await logActivity('MODULE_DOC_SAVE', `Lưu văn bản Word phân hệ [${moduleId.toUpperCase()}] cho lớp ${lop}`);
+    res.json({ success: true, updated_at: new Date().toISOString() });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
