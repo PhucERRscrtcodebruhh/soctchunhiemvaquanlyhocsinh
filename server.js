@@ -34,6 +34,25 @@ const initLogsTable = async () => {
 };
 initLogsTable();
 
+// Tự động khởi tạo bảng Tài liệu & Tệp tin lưu trữ (Word / Excel)
+const initDocumentsTable = async () => {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS tbl_saved_documents (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        file_name VARCHAR(255) NOT NULL,
+        file_type VARCHAR(50) NOT NULL,
+        file_data LONGTEXT NOT NULL,
+        ma_lop VARCHAR(50) NOT NULL,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    `);
+  } catch (err) {
+    console.error('Khởi tạo tbl_saved_documents thất bại:', err.message);
+  }
+};
+initDocumentsTable();
+
 // Hàm ghi log vào DB
 const logActivity = async (action, details) => {
   try {
@@ -709,6 +728,75 @@ app.delete('/api/bgh/:id', async (req, res) => {
   try {
     await pool.query('DELETE FROM tbl_kiemtra_bgh WHERE id=?', [req.params.id]);
     await logActivity('BGH_DELETE', `Xóa nhận xét BGH ID #${req.params.id}`);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ==========================================
+// 12. TÀI LIỆU VÀ TỆP TIN LƯU TRỮ (WORD / EXCEL)
+// ==========================================
+app.get('/api/documents', async (req, res) => {
+  const ma_lop = req.query.ma_lop || '10A1';
+  try {
+    const [rows] = await pool.query(
+      'SELECT id, file_name, file_type, ma_lop, updated_at FROM tbl_saved_documents WHERE ma_lop = ? ORDER BY updated_at DESC', 
+      [ma_lop]
+    );
+    res.json(rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/documents/:id', async (req, res) => {
+  try {
+    const [rows] = await pool.query('SELECT * FROM tbl_saved_documents WHERE id = ?', [req.params.id]);
+    if (rows.length === 0) return res.status(404).json({ error: 'Không tìm thấy tệp' });
+    res.json(rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/documents/save', async (req, res) => {
+  const { file_name, file_type, file_data, ma_lop } = req.body;
+  const lop = ma_lop || '10A1';
+  if (!file_name || !file_data) {
+    return res.status(400).json({ error: 'Thiếu thông tin tên tệp hoặc dữ liệu' });
+  }
+  try {
+    const [existing] = await pool.query(
+      'SELECT id FROM tbl_saved_documents WHERE file_name = ? AND ma_lop = ?', 
+      [file_name, lop]
+    );
+    let docId;
+    if (existing.length > 0) {
+      docId = existing[0].id;
+      await pool.query(
+        'UPDATE tbl_saved_documents SET file_data = ?, file_type = ?, updated_at = NOW() WHERE id = ?', 
+        [file_data, file_type || 'document', docId]
+      );
+      await logActivity('DOC_UPDATE', `Cập nhật tệp ${file_type?.toUpperCase() || ''}: ${file_name} (${lop})`);
+    } else {
+      const [result] = await pool.query(
+        'INSERT INTO tbl_saved_documents (file_name, file_type, file_data, ma_lop, updated_at) VALUES (?, ?, ?, ?, NOW())',
+        [file_name, file_type || 'document', file_data, lop]
+      );
+      docId = result.insertId;
+      await logActivity('DOC_SAVE', `Lưu tệp mới ${file_type?.toUpperCase() || ''}: ${file_name} (${lop})`);
+    }
+    res.json({ success: true, id: docId, file_name, updated_at: new Date().toISOString() });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/documents/:id', async (req, res) => {
+  try {
+    await pool.query('DELETE FROM tbl_saved_documents WHERE id = ?', [req.params.id]);
+    await logActivity('DOC_DELETE', `Xóa tệp lưu trữ ID #${req.params.id}`);
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });

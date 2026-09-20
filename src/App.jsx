@@ -8,6 +8,8 @@ import AuthModal from './components/AuthModal';
 import Sidebar from './components/Sidebar';
 import ThemeToggle from './components/ThemeToggle';
 import DbHealthBadge from './components/DbHealthBadge';
+import UnsavedChangesModal from './components/UnsavedChangesModal';
+import FileWorkspaceModule from './modules/FileWorkspaceModule';
 import { MODULE_REGISTRY } from './modules';
 
 export default function App() {
@@ -53,7 +55,28 @@ export default function App() {
     }
   });
 
+  // 3.1. Quản lý cảnh báo Unsaved Changes khi chuyển trang hoặc tắt trình duyệt
+  const [isDocumentDirty, setIsDocumentDirty] = useState(false);
+  const [pendingTab, setPendingTab] = useState(null);
+  const [showUnsavedModal, setShowUnsavedModal] = useState(false);
+
+  useEffect(() => {
+    const handleBeforeUnload = (e) => {
+      if (isDocumentDirty) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [isDocumentDirty]);
+
   const handleSelectTab = (tab) => {
+    if (isDocumentDirty && tab !== activeTab) {
+      setPendingTab(tab);
+      setShowUnsavedModal(true);
+      return;
+    }
     setActiveTab(tab);
     try {
       localStorage.setItem('sotay_tab', tab);
@@ -566,6 +589,13 @@ export default function App() {
             </div>
           )}
 
+          {/* 3.1. SOẠN THẢO & QUẢN LÝ TỆP (WORD & EXCEL TRỰC TUYẾN) */}
+          {activeTab === 'file_workspace' && (
+            <div className="max-w-6xl">
+              <FileWorkspaceModule classData={classState} maLop={selectedClass} />
+            </div>
+          )}
+
           {/* 4. RENDER CÁC COG MODULE (TỰ ĐỘNG KHỚP THEO REGISTRY VÀ LỌC THEO MÃ LỚP) */}
           {ActiveComponent && <ActiveComponent classData={classState} maLop={selectedClass} />}
 
@@ -628,6 +658,32 @@ export default function App() {
 
         </main>
       </div>
+
+      {/* Unsaved Changes Warning Modal */}
+      <UnsavedChangesModal
+        isOpen={showUnsavedModal}
+        documentTitle="tài liệu đang chỉnh sửa"
+        onCancel={() => {
+          setShowUnsavedModal(false);
+          setPendingTab(null);
+        }}
+        onDiscard={() => {
+          setIsDocumentDirty(false);
+          setShowUnsavedModal(false);
+          if (pendingTab) {
+            setActiveTab(pendingTab);
+            setPendingTab(null);
+          }
+        }}
+        onSaveAndProceed={() => {
+          setIsDocumentDirty(false);
+          setShowUnsavedModal(false);
+          if (pendingTab) {
+            setActiveTab(pendingTab);
+            setPendingTab(null);
+          }
+        }}
+      />
     </div>
   );
 }

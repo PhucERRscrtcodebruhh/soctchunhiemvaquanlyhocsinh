@@ -1,5 +1,5 @@
 import React from 'react';
-import { Home, LayoutDashboard, FileText, Terminal, LogOut, Sun, Moon } from 'lucide-react';
+import { Home, LayoutDashboard, FileText, Terminal, LogOut, Sun, Moon, FileSpreadsheet } from 'lucide-react';
 import { MODULE_REGISTRY } from '../modules';
 
 export default function Sidebar({ 
@@ -94,6 +94,17 @@ export default function Sidebar({
               }`}
             >
               <FileText className="w-4 h-4" /> <span>Thông tư 22/2021/TT-BGDĐT</span>
+            </button>
+            <button
+              onClick={() => onSelectTab('file_workspace')}
+              className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium transition ${
+                activeTab === 'file_workspace' 
+                  ? 'bg-cyan-500/15 text-cyan-600 dark:text-cyan-400 border border-cyan-500/30 font-semibold' 
+                  : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/80 hover:text-slate-900 dark:hover:text-slate-200'
+              }`}
+            >
+              <FileSpreadsheet className="w-4 h-4 text-emerald-400" /> 
+              <span>Soạn thảo Tệp (Word / Excel)</span>
             </button>
           </div>
 
