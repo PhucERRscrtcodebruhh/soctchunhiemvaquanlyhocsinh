@@ -2,8 +2,24 @@ import React, { useState, useEffect } from 'react';
 import { FileText, Printer, Eye, Edit3, RefreshCw } from 'lucide-react';
 import WordDocumentEditor from './WordDocumentEditor';
 
+const MODULE_KEY_MAP = {
+  soyeulylich: 'so_yeu_ly_lich',
+  phuhuynh: 'ban_dai_dien_cha_me',
+  canbo: 'can_bo_lop_doan',
+  sodo: 'so_do_lop_hoc',
+  tkb: 'thoi_khoa_bieu',
+  theodoi: 'theo_doi_hoc_tap',
+  cabiet: 'giao_duc_ca_biet',
+  sinhhoat: 'sinh_hoat_lop',
+  tt22: 'thong_tu_22',
+  thidua: 'thi_dua_lop',
+  bangiao: 'bien_ban_ban_giao',
+  bgh: 'kiem_tra_bgh'
+};
+
 export default function ModuleWordEditor({
   moduleId,
+  moduleKey = null,
   moduleTitle,
   moduleDesc,
   maLop = '10A1',
@@ -12,6 +28,7 @@ export default function ModuleWordEditor({
   children = null, // Optional alternative/raw table view
   rawTableTitle = 'Dữ liệu thô'
 }) {
+  const effectiveKey = moduleKey || MODULE_KEY_MAP[moduleId] || moduleId;
   const [docHtml, setDocHtml] = useState(null);
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState('word'); // 'word' | 'raw'
@@ -21,11 +38,11 @@ export default function ModuleWordEditor({
   const loadModuleDocument = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/modules/document?moduleId=${encodeURIComponent(moduleId)}&ma_lop=${encodeURIComponent(maLop)}`);
+      const res = await fetch(`/api/modules/load?class_id=${encodeURIComponent(maLop)}&module_key=${encodeURIComponent(effectiveKey)}`);
       if (res.ok) {
         const data = await res.json();
-        if (data && data.content) {
-          setDocHtml(data.content);
+        if (data && data.content_json) {
+          setDocHtml(data.content_json);
         } else {
           setDocHtml(defaultHtml);
         }
@@ -33,7 +50,7 @@ export default function ModuleWordEditor({
         setDocHtml(defaultHtml);
       }
     } catch (err) {
-      console.warn(`Lỗi tải văn bản ${moduleId}:`, err);
+      console.warn(`Lỗi tải văn bản ${effectiveKey}:`, err);
       setDocHtml(defaultHtml);
     } finally {
       setLoading(false);
@@ -43,25 +60,28 @@ export default function ModuleWordEditor({
 
   useEffect(() => {
     loadModuleDocument();
-  }, [moduleId, maLop, defaultHtml]);
+  }, [effectiveKey, maLop, defaultHtml]);
 
   // Handle Save from WordDocumentEditor to MySQL backend
-  const handleSaveToBackend = async ({ html, fileName }) => {
+  const handleSaveToBackend = async ({ html, fileName, docxBase64 }) => {
     try {
-      const res = await fetch('/api/modules/document', {
+      const res = await fetch('/api/modules/save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          moduleId,
-          ma_lop: maLop,
-          document_content: html
+          class_id: maLop,
+          module_key: effectiveKey,
+          doc_type: 'WORD',
+          file_name: `${fileName || effectiveKey}.docx`,
+          content_json: html,
+          file_blob_base64: docxBase64 || null
         })
       });
       if (res.ok) {
         setDocHtml(html);
       }
     } catch (e) {
-      console.error(`Lỗi lưu văn bản module ${moduleId}:`, e);
+      console.error(`Lỗi lưu văn bản module ${effectiveKey}:`, e);
     }
   };
 
@@ -137,10 +157,11 @@ export default function ModuleWordEditor({
         ) : (
           <div className="rounded-2xl">
             <WordDocumentEditor
-              key={`doc-${moduleId}-${maLop}-${editorKey}`}
+              key={`doc-${effectiveKey}-${maLop}-${editorKey}`}
               initialHtml={docHtml || defaultHtml}
-              defaultFileName={exportFileName || `Van_Ban_${moduleId}_${maLop}`}
+              defaultFileName={exportFileName || `Van_Ban_${effectiveKey}_${maLop}`}
               maLop={maLop}
+              moduleKey={effectiveKey}
               title={moduleTitle}
               onSaveToBackend={handleSaveToBackend}
             />

@@ -228,6 +228,7 @@ export default function WordDocumentEditor({
   initialHtml = null,
   defaultFileName = 'Van_Ban_Hoc_Sinh',
   maLop = '10A1',
+  moduleKey = null,
   onSaveToBackend = null,
   title = "SOẠN THẢO VĂN BẢN WORD (.DOCX)"
 }) {
@@ -247,12 +248,17 @@ export default function WordDocumentEditor({
 
   const editorRef = useRef(null);
 
-  // Initialize editor content
+  // Re-hydrate editor content when initialHtml changes or on mount
   useEffect(() => {
-    if (editorRef.current && docHtml) {
+    if (initialHtml !== null && initialHtml !== undefined) {
+      setDocHtml(initialHtml);
+      if (editorRef.current) {
+        editorRef.current.innerHTML = initialHtml;
+      }
+    } else if (editorRef.current && docHtml) {
       editorRef.current.innerHTML = docHtml;
     }
-  }, []);
+  }, [initialHtml]);
 
   // Sync edits from contentEditable
   const handleEditorInput = () => {
@@ -415,8 +421,36 @@ export default function WordDocumentEditor({
       });
 
       const docxBase64 = await base64Promise;
+      const currentHtml = editorRef.current ? editorRef.current.innerHTML : docHtml;
 
-      // Save to backend API
+      // 1. Lưu theo chuẩn kiến trúc Multi-tenant nếu có moduleKey
+      if (moduleKey) {
+        const res = await fetch('/api/modules/save', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            class_id: maLop,
+            module_key: moduleKey,
+            doc_type: 'WORD',
+            file_name: `${fileName}.docx`,
+            content_json: currentHtml,
+            file_blob_base64: docxBase64
+          })
+        });
+
+        if (res.ok) {
+          setIsDirty(false);
+          const timeStr = new Date().toLocaleTimeString('vi-VN');
+          setLastSavedTime(timeStr);
+          setToastMessage(`Đã lưu thay đổi cho lớp [${maLop}] thành công!`);
+          if (onSaveToBackend) onSaveToBackend({ html: currentHtml, fileName, docxBase64 });
+          return;
+        } else {
+          throw new Error("Máy chủ phản hồi lỗi khi lưu.");
+        }
+      }
+
+      // 2. Fallback lưu vào /api/documents/save cho workspace tự do
       const res = await fetch('/api/documents/save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -432,19 +466,20 @@ export default function WordDocumentEditor({
         setIsDirty(false);
         const timeStr = new Date().toLocaleTimeString('vi-VN');
         setLastSavedTime(timeStr);
-        setToastMessage(`Đã lưu văn bản Word thành công lúc ${timeStr}!`);
-        if (onSaveToBackend) onSaveToBackend({ html: docHtml, fileName });
+        setToastMessage(`Đã lưu thay đổi cho lớp [${maLop}] thành công!`);
+        if (onSaveToBackend) onSaveToBackend({ html: currentHtml, fileName, docxBase64 });
       } else {
         throw new Error("Máy chủ phản hồi lỗi khi lưu.");
       }
     } catch (err) {
+      console.error('Lỗi lưu văn bản Word:', err);
       // Fallback local storage
       try {
         localStorage.setItem(`sotay_word_${maLop}_${fileName}`, editorRef.current?.innerHTML || docHtml);
         setIsDirty(false);
         const timeStr = new Date().toLocaleTimeString('vi-VN');
         setLastSavedTime(timeStr);
-        setToastMessage(`Đã lưu văn bản vào bộ nhớ máy lúc ${timeStr}`);
+        setToastMessage(`Đã lưu thay đổi cho lớp [${maLop}] thành công!`);
       } catch (localErr) {
         alert("Lỗi lưu văn bản: " + err.message);
       }

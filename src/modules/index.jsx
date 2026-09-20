@@ -12,21 +12,49 @@ import ModuleWordEditor from '../components/ModuleWordEditor';
 // PHÂN HỆ 1: TỔ CHỨC & HỒ SƠ LỚP (4 MODULES)
 // =========================================================================
 
-// 1. SƠ YẾU LÝ LỊCH HỌC SINH (EXCEL SPREADSHEET PAD + ĐỒNG BỘ MYSQL)
+// 1. SƠ YẾU LÝ LỊCH HỌC SINH (EXCEL SPREADSHEET PAD + ĐỒNG BỘ MYSQL MULTI-TENANT)
 export function LyLichHocSinh({ maLop, classData }) {
   const currentLop = maLop || classData?.className || '10A1';
-  const [students, setStudents] = useState([]);
+  const [savedSheets, setSavedSheets] = useState(null);
+  const [fallbackStudents, setFallbackStudents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [gridKey, setGridKey] = useState(0);
 
   const loadData = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/soyeulylich?ma_lop=${encodeURIComponent(currentLop)}`);
+      // 1. Ưu tiên nạp từ /api/modules/load (Multi-tenant state persistence)
+      const res = await fetch(`/api/modules/load?class_id=${encodeURIComponent(currentLop)}&module_key=so_yeu_ly_lich`);
       if (res.ok) {
         const data = await res.json();
-        setStudents(Array.isArray(data) ? data : []);
+        if (data && data.content_json) {
+          try {
+            const parsed = typeof data.content_json === 'string' ? JSON.parse(data.content_json) : data.content_json;
+            if (parsed && typeof parsed === 'object') {
+              if (parsed.sheets && typeof parsed.sheets === 'object') {
+                setSavedSheets(parsed.sheets);
+              } else if (Array.isArray(parsed)) {
+                setSavedSheets({ "Sheet1": parsed });
+              } else {
+                setSavedSheets(parsed);
+              }
+              setLoading(false);
+              setGridKey(k => k + 1);
+              return;
+            }
+          } catch (pe) {
+            console.warn('Lỗi phân tích content_json bảng tính:', pe);
+          }
+        }
       }
+
+      // 2. Fallback nếu chưa có tài liệu lưu trữ: Nạp từ danh sách học sinh
+      const resStudents = await fetch(`/api/soyeulylich?ma_lop=${encodeURIComponent(currentLop)}`);
+      if (resStudents.ok) {
+        const data = await resStudents.json();
+        setFallbackStudents(Array.isArray(data) ? data : []);
+      }
+      setSavedSheets(null);
     } catch (err) {
       console.error('Lỗi tải danh sách sơ yếu lý lịch:', err);
     } finally {
@@ -39,10 +67,10 @@ export function LyLichHocSinh({ maLop, classData }) {
     loadData();
   }, [currentLop]);
 
-  // Khởi tạo bảng tính 2D từ danh sách học sinh thật trong MySQL
+  // Khởi tạo bảng tính 2D dự phòng nếu chưa có trong class_module_documents
   const initialGrid = useMemo(() => {
     const headers = ['STT', 'Họ và tên', 'Ngày sinh', 'Giới tính', 'Họ tên Cha/Mẹ', 'Số điện thoại', 'Địa chỉ', 'Tổ số', 'Chức vụ trong tổ'];
-    if (students.length === 0) {
+    if (fallbackStudents.length === 0) {
       return [
         headers,
         [1, 'Nguyễn Văn An', '15/05/2010', 'Nam', 'Nguyễn Văn Ba', '0912345678', 'Phù Cừ, Hưng Yên', 1, 'Tổ trưởng'],
@@ -52,7 +80,7 @@ export function LyLichHocSinh({ maLop, classData }) {
         [5, 'Hoàng Thuỳ Dung', '18/09/2010', 'Nữ', 'Hoàng Văn Giang', '0911223344', 'Phù Cừ, Hưng Yên', 3, 'Tổ trưởng']
       ];
     }
-    const rows = students.map((s, idx) => [
+    const rows = fallbackStudents.map((s, idx) => [
       idx + 1,
       s.ho_ten || '',
       s.ngay_sinh || '',
@@ -64,58 +92,31 @@ export function LyLichHocSinh({ maLop, classData }) {
       s.chuc_vu_to || 'Thành viên'
     ]);
     return [headers, ...rows];
-  }, [students]);
+  }, [fallbackStudents]);
 
-  // Xử lý khi nhấn "Lưu thay đổi": Parse grid và gửi sync về MySQL tbl_soyeulylich
-  const handleSaveToBackend = async ({ sheets }) => {
-    const activeSheetName = Object.keys(sheets)[0] || 'Sheet1';
-    const rawRows = sheets[activeSheetName] || [];
-    if (rawRows.length <= 1) return;
-
-    const contentRows = rawRows.slice(1).filter(r => r && r.some(c => c !== undefined && c !== null && String(c).trim() !== ''));
-
-    const parsedStudents = contentRows.map(r => {
-      const ho_ten = String(r[1] || r[0] || '').trim();
-      return {
-        ho_ten,
-        ngay_sinh: String(r[2] || '').trim(),
-        gioi_tinh: String(r[3] || 'Nam').trim(),
-        ho_ten_ph: String(r[4] || '').trim(),
-        so_dien_thoai: String(r[5] || '').trim(),
-        dia_chi: String(r[6] || '').trim(),
-        to_so: Number(r[7]) || 1,
-        chuc_vu_to: String(r[8] || 'Thành viên').trim(),
-        ma_lop: currentLop
-      };
-    }).filter(s => s.ho_ten && s.ho_ten.length > 1 && !s.ho_ten.toLowerCase().includes('họ và tên'));
-
-    const res = await fetch('/api/soyeulylich/sync', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ students: parsedStudents, ma_lop: currentLop })
-    });
-
-    if (res.ok) {
-      loadData();
-    }
+  // Xử lý sau khi lưu: cập nhật lại dữ liệu lớp
+  const handleSaveToBackend = async () => {
+    loadData();
   };
 
   return (
     <ModuleContainer 
       title="SƠ YẾU LÝ LỊCH HỌC SINH" 
-      desc={`Bảng tính tương tác trực tuyến • Tự động đồng bộ MySQL lớp ${currentLop} • Nhập / Xuất Excel (.xlsx)`}
+      desc={`Bảng tính tương tác trực tuyến • Tự động đồng bộ MySQL lớp ${currentLop} • Khắc phục mất dữ liệu khi F5`}
     >
       {loading ? (
         <div className="py-20 text-center text-slate-400 text-xs flex items-center justify-center gap-2">
           <RefreshCw className="w-4 h-4 animate-spin text-cyan-400" />
-          <span>Đang nạp dữ liệu hồ sơ học sinh từ cơ sở dữ liệu MySQL...</span>
+          <span>Đang nạp dữ liệu hồ sơ học sinh lớp {currentLop} từ cơ sở dữ liệu MySQL...</span>
         </div>
       ) : (
         <ExcelSpreadsheetEditor
           key={`lylich-${currentLop}-${gridKey}`}
-          initialData={initialGrid}
+          initialSheets={savedSheets}
+          initialData={savedSheets ? null : initialGrid}
           defaultFileName={`So_Yeu_Ly_Lich_${currentLop}`}
           maLop={currentLop}
+          moduleKey="so_yeu_ly_lich"
           title={`SƠ YẾU LÝ LỊCH HỌC SINH - LỚP ${currentLop}`}
           onSaveToBackend={handleSaveToBackend}
         />

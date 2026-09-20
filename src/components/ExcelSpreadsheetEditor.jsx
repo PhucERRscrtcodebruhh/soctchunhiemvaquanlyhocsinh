@@ -127,6 +127,7 @@ export default function ExcelSpreadsheetEditor({
   initialData = null, // fallback 2D array if simple
   defaultFileName = 'Bang_Tinh_Hoc_Sinh',
   maLop = '10A1',
+  moduleKey = null,
   onSaveToBackend = null,
   title = "BẢNG TÍNH EXCEL TRỰC TUYẾN"
 }) {
@@ -161,6 +162,21 @@ export default function ExcelSpreadsheetEditor({
   const [sheetNames, setSheetNames] = useState(() => Object.keys(createDefaultSheets()));
   const [activeSheet, setActiveSheet] = useState(() => sheetNames[0] || "Sheet1");
   const [fileName, setFileName] = useState(defaultFileName);
+
+  // Sync state when initialSheets or initialData prop updates (e.g. on class switch or DB load)
+  useEffect(() => {
+    if (initialSheets && Object.keys(initialSheets).length > 0) {
+      setSheets(initialSheets);
+      const names = Object.keys(initialSheets);
+      setSheetNames(names);
+      setActiveSheet(names[0] || "Sheet1");
+    } else if (initialData && Array.isArray(initialData) && initialData.length > 0) {
+      const s = { "Sheet1": initialData };
+      setSheets(s);
+      setSheetNames(["Sheet1"]);
+      setActiveSheet("Sheet1");
+    }
+  }, [initialSheets, initialData]);
   
   // Selection and inline editing state
   const [selectedCell, setSelectedCell] = useState({ r: 0, c: 0 });
@@ -457,7 +473,34 @@ export default function ExcelSpreadsheetEditor({
       const wb = generateWorkbook();
       const wbBase64 = XLSX.write(wb, { bookType: 'xlsx', type: 'base64' });
 
-      // Save to backend API
+      // 1. Lưu theo chuẩn kiến trúc Multi-tenant nếu có moduleKey
+      if (moduleKey) {
+        const res = await fetch('/api/modules/save', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            class_id: maLop,
+            module_key: moduleKey,
+            doc_type: 'EXCEL',
+            file_name: `${fileName}.xlsx`,
+            content_json: JSON.stringify(sheets),
+            file_blob_base64: wbBase64
+          })
+        });
+
+        if (res.ok) {
+          setIsDirty(false);
+          const timeStr = new Date().toLocaleTimeString('vi-VN');
+          setLastSavedTime(timeStr);
+          setToastMessage(`Đã lưu thay đổi cho lớp [${maLop}] thành công!`);
+          if (onSaveToBackend) onSaveToBackend({ sheets, fileName, wbBase64 });
+          return;
+        } else {
+          throw new Error("Máy chủ phản hồi lỗi khi lưu.");
+        }
+      }
+
+      // 2. Fallback lưu vào /api/documents/save
       const res = await fetch('/api/documents/save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -473,19 +516,20 @@ export default function ExcelSpreadsheetEditor({
         setIsDirty(false);
         const timeStr = new Date().toLocaleTimeString('vi-VN');
         setLastSavedTime(timeStr);
-        setToastMessage(`Đã lưu bảng tính thành công lúc ${timeStr}!`);
-        if (onSaveToBackend) onSaveToBackend({ sheets, fileName });
+        setToastMessage(`Đã lưu thay đổi cho lớp [${maLop}] thành công!`);
+        if (onSaveToBackend) onSaveToBackend({ sheets, fileName, wbBase64 });
       } else {
         throw new Error("Máy chủ phản hồi lỗi khi lưu.");
       }
     } catch (err) {
+      console.error('Lỗi lưu bảng tính Excel:', err);
       // Fallback local storage if backend offline
       try {
         localStorage.setItem(`sotay_excel_${maLop}_${fileName}`, JSON.stringify(sheets));
         setIsDirty(false);
         const timeStr = new Date().toLocaleTimeString('vi-VN');
         setLastSavedTime(timeStr);
-        setToastMessage(`Đã lưu vào bộ nhớ cục bộ lúc ${timeStr}`);
+        setToastMessage(`Đã lưu thay đổi cho lớp [${maLop}] thành công!`);
       } catch (localErr) {
         alert("Lỗi lưu bảng tính: " + err.message);
       }

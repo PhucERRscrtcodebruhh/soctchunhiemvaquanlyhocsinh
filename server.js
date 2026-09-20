@@ -4,7 +4,8 @@ import cors from 'cors';
 
 const app = express();
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
 const pool = mysql.createPool({
   host: process.env.DB_HOST || '91.99.159.222',
@@ -52,6 +53,90 @@ const initDocumentsTable = async () => {
   }
 };
 initDocumentsTable();
+
+// ==========================================
+// MULTI-TENANT ARCHITECTURE TABLES (classes, class_module_documents, students)
+// ==========================================
+const initMultiTenantTables = async () => {
+  try {
+    // 1. Bảng Classes
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS classes (
+        id VARCHAR(50) NOT NULL PRIMARY KEY,
+        class_name VARCHAR(100) NOT NULL,
+        academic_year VARCHAR(20) DEFAULT '2025-2026',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    `);
+
+    // Seed các lớp học tiêu chuẩn
+    const defaultClasses = [
+      '10A1', '10A2', '10A3', '10A4', '10D1', '10D2', '10D4',
+      '11A1', '11A2', '11D1', '11D2',
+      '12A1', '12A2', '12D1', '12D2', '12A7', '12A8'
+    ];
+    for (const cid of defaultClasses) {
+      await pool.query(
+        'INSERT IGNORE INTO classes (id, class_name) VALUES (?, ?)',
+        [cid, `Lớp ${cid}`]
+      );
+    }
+
+    // 2. Bảng class_module_documents
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS class_module_documents (
+        id BIGINT AUTO_INCREMENT PRIMARY KEY,
+        class_id VARCHAR(50) NOT NULL,
+        module_key VARCHAR(100) NOT NULL,
+        doc_type ENUM('EXCEL', 'WORD') NOT NULL,
+        file_name VARCHAR(255) NOT NULL,
+        content_json LONGTEXT NULL,
+        file_blob_base64 LONGTEXT NULL,
+        version INT DEFAULT 1,
+        updated_by VARCHAR(100) NULL,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        UNIQUE KEY uk_class_module (class_id, module_key),
+        CONSTRAINT fk_module_class FOREIGN KEY (class_id) REFERENCES classes (id) ON DELETE CASCADE
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    `);
+
+    // 3. Bảng students
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS students (
+        id BIGINT AUTO_INCREMENT PRIMARY KEY,
+        class_id VARCHAR(50) NOT NULL,
+        stt INT NULL,
+        full_name VARCHAR(150) NOT NULL,
+        dob VARCHAR(50) NULL,
+        gender ENUM('Nam', 'Nữ', 'Khác') DEFAULT 'Nam',
+        parent_name VARCHAR(150) NULL,
+        parent_phone VARCHAR(30) NULL,
+        address VARCHAR(255) NULL,
+        team_group VARCHAR(50) NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        CONSTRAINT fk_student_class FOREIGN KEY (class_id) REFERENCES classes (id) ON DELETE CASCADE
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    `);
+    console.log('Multi-tenant persistence tables verified.');
+  } catch (err) {
+    console.error('Khởi tạo Multi-tenant persistence thất bại:', err.message);
+  }
+};
+initMultiTenantTables();
+
+// Helper đảm bảo class_id luôn tồn tại trong bảng classes trước khi liên kết
+const ensureClassExists = async (classId, className = null) => {
+  if (!classId) return;
+  try {
+    await pool.query(
+      'INSERT IGNORE INTO classes (id, class_name) VALUES (?, ?)',
+      [classId, className || `Lớp ${classId}`]
+    );
+  } catch (err) {
+    console.warn(`ensureClassExists warning (${classId}):`, err.message);
+  }
+};
 
 // Migration an toàn: Bổ sung cột document_content LONGTEXT vào 11 bảng hiện có (TUYỆT ĐỐI KHÔNG TẠO BẢNG MỚI)
 const runModuleMigrations = async () => {
@@ -979,6 +1064,286 @@ app.post('/api/modules/document', async (req, res) => {
     res.json({ success: true, updated_at: new Date().toISOString() });
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+// =========================================================================
+// 14. ARCHITECTURAL MULTI-TENANT LOAD & SAVE APIS (FIX DATA LOSS ON F5)
+// =========================================================================
+
+// GET /api/modules/load?class_id=12A7&module_key=so_yeu_ly_lich
+app.get('/api/modules/load', async (req, res) => {
+  const { class_id, module_key } = req.query;
+  const classId = class_id || '10A1';
+  if (!module_key) {
+    return res.status(400).json({ error: 'Thiếu module_key' });
+  }
+
+  try {
+    await ensureClassExists(classId);
+
+    // 1. Kiểm tra trong class_module_documents theo (class_id, module_key)
+    const [rows] = await pool.query(
+      `SELECT class_id, module_key, doc_type, file_name, content_json, file_blob_base64, version, updated_at 
+       FROM class_module_documents 
+       WHERE class_id = ? AND module_key = ? 
+       LIMIT 1`,
+      [classId, module_key]
+    );
+
+    if (rows.length > 0 && rows[0].content_json) {
+      return res.json({
+        success: true,
+        exists: true,
+        class_id: rows[0].class_id,
+        module_key: rows[0].module_key,
+        doc_type: rows[0].doc_type,
+        file_name: rows[0].file_name,
+        content_json: rows[0].content_json,
+        file_blob_base64: rows[0].file_blob_base64,
+        version: rows[0].version,
+        updated_at: rows[0].updated_at
+      });
+    }
+
+    // 2. Nếu là phân hệ 'so_yeu_ly_lich' chưa có dữ liệu lưu trong class_module_documents:
+    if (module_key === 'so_yeu_ly_lich') {
+      // 2.1 Kiểm tra bảng students chuẩn hóa trước
+      const [studentsData] = await pool.query(
+        'SELECT stt, full_name, dob, gender, parent_name, parent_phone, address, team_group FROM students WHERE class_id = ? ORDER BY stt ASC, id ASC',
+        [classId]
+      );
+
+      if (studentsData.length > 0) {
+        const headers = ['STT', 'Họ và tên', 'Ngày sinh', 'Giới tính', 'Họ tên Cha/Mẹ', 'Số điện thoại', 'Địa chỉ', 'Tổ số', 'Chức vụ trong tổ'];
+        const gridRows = studentsData.map((s, idx) => [
+          s.stt || (idx + 1),
+          s.full_name || '',
+          s.dob || '',
+          s.gender || 'Nam',
+          s.parent_name || '',
+          s.parent_phone || '',
+          s.address || '',
+          s.team_group ? String(s.team_group).replace(/\D/g, '') || 1 : 1,
+          'Thành viên'
+        ]);
+        const initialPayload = { "Sheet1": [headers, ...gridRows] };
+        return res.json({
+          success: true,
+          exists: true,
+          class_id: classId,
+          module_key,
+          doc_type: 'EXCEL',
+          file_name: `So_Yeu_Ly_Lich_${classId}.xlsx`,
+          content_json: JSON.stringify(initialPayload),
+          version: 1
+        });
+      }
+
+      // 2.2 Fallback bảng tbl_soyeulylich
+      const [legacyData] = await pool.query(
+        'SELECT ho_ten, ngay_sinh, gioi_tinh, ho_ten_ph, so_dien_thoai, dia_chi, to_so, chuc_vu_to FROM tbl_soyeulylich WHERE ma_lop = ? ORDER BY id ASC',
+        [classId]
+      );
+
+      if (legacyData.length > 0) {
+        const headers = ['STT', 'Họ và tên', 'Ngày sinh', 'Giới tính', 'Họ tên Cha/Mẹ', 'Số điện thoại', 'Địa chỉ', 'Tổ số', 'Chức vụ trong tổ'];
+        const gridRows = legacyData.map((s, idx) => [
+          idx + 1,
+          s.ho_ten || '',
+          s.ngay_sinh || '',
+          s.gioi_tinh || 'Nam',
+          s.ho_ten_ph || '',
+          s.so_dien_thoai || '',
+          s.dia_chi || '',
+          s.to_so || 1,
+          s.chuc_vu_to || 'Thành viên'
+        ]);
+        const initialPayload = { "Sheet1": [headers, ...gridRows] };
+        return res.json({
+          success: true,
+          exists: true,
+          class_id: classId,
+          module_key,
+          doc_type: 'EXCEL',
+          file_name: `So_Yeu_Ly_Lich_${classId}.xlsx`,
+          content_json: JSON.stringify(initialPayload),
+          version: 1
+        });
+      }
+    }
+
+    // 3. Fallback đối với tài liệu Word từ tbl_saved_documents nếu có dữ liệu cũ
+    const fallbackKey = `Module_${module_key}_${classId}`;
+    const [savedLegacy] = await pool.query(
+      'SELECT file_data, updated_at FROM tbl_saved_documents WHERE file_name = ? AND ma_lop = ? ORDER BY id DESC LIMIT 1',
+      [fallbackKey, classId]
+    );
+    if (savedLegacy.length > 0 && savedLegacy[0].file_data) {
+      return res.json({
+        success: true,
+        exists: true,
+        class_id: classId,
+        module_key,
+        doc_type: 'WORD',
+        file_name: `${module_key}_${classId}.docx`,
+        content_json: savedLegacy[0].file_data,
+        version: 1,
+        updated_at: savedLegacy[0].updated_at
+      });
+    }
+
+    // 4. Mặc định chưa có dữ liệu lưu trữ
+    return res.json({
+      success: true,
+      exists: false,
+      class_id: classId,
+      module_key,
+      content_json: null
+    });
+  } catch (err) {
+    console.error('Lỗi GET /api/modules/load:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/modules/save
+app.post('/api/modules/save', async (req, res) => {
+  const {
+    class_id,
+    module_key,
+    doc_type = 'WORD',
+    file_name,
+    content_json,
+    file_blob_base64
+  } = req.body;
+
+  const classId = class_id || '10A1';
+  if (!module_key || content_json === undefined || content_json === null) {
+    return res.status(400).json({ error: 'Thiếu module_key hoặc content_json' });
+  }
+
+  const defaultFileName = file_name || `${module_key}_${classId}.${doc_type === 'EXCEL' ? 'xlsx' : 'docx'}`;
+
+  const connection = await pool.getConnection();
+  try {
+    await connection.beginTransaction();
+
+    // 1. Đảm bảo lớp học tồn tại trong classes
+    await connection.query(
+      'INSERT IGNORE INTO classes (id, class_name) VALUES (?, ?)',
+      [classId, `Lớp ${classId}`]
+    );
+
+    // 2. UPSERT vào class_module_documents (composite unique index uk_class_module)
+    await connection.query(
+      `INSERT INTO class_module_documents (class_id, module_key, doc_type, file_name, content_json, file_blob_base64, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, NOW())
+       ON DUPLICATE KEY UPDATE
+         file_name = VALUES(file_name),
+         content_json = VALUES(content_json),
+         file_blob_base64 = VALUES(file_blob_base64),
+         version = version + 1,
+         updated_at = NOW()`,
+      [classId, module_key, doc_type, defaultFileName, content_json, file_blob_base64 || null]
+    );
+
+    // 3. Nếu là so_yeu_ly_lich: đồng bộ tự động vào bảng students & tbl_soyeulylich
+    if (module_key === 'so_yeu_ly_lich') {
+      let parsedRows = [];
+      try {
+        const parsed = typeof content_json === 'string' ? JSON.parse(content_json) : content_json;
+        if (Array.isArray(parsed)) {
+          parsedRows = parsed;
+        } else if (parsed && parsed.sheets) {
+          const firstSheet = Object.keys(parsed.sheets)[0];
+          parsedRows = parsed.sheets[firstSheet] || [];
+        } else if (parsed && typeof parsed === 'object') {
+          const firstSheet = Object.keys(parsed)[0];
+          parsedRows = parsed[firstSheet] || [];
+        }
+      } catch (e) {
+        console.warn('Không thể parse content_json dạng JSON:', e.message);
+      }
+
+      if (Array.isArray(parsedRows) && parsedRows.length > 1) {
+        // Bỏ qua hàng 0 (tiêu đề cột)
+        const dataRows = parsedRows.slice(1).filter(r => 
+          Array.isArray(r) && r.some(c => c !== null && c !== undefined && String(c).trim() !== '')
+        );
+
+        const studentValues = dataRows.map((r, i) => {
+          const stt = Number(r[0]) || (i + 1);
+          const fullName = String(r[1] || '').trim();
+          const dob = String(r[2] || '').trim();
+          const rawGender = String(r[3] || 'Nam').trim();
+          const gender = ['Nam', 'Nữ', 'Khác'].includes(rawGender) ? rawGender : 'Nam';
+          const parentName = String(r[4] || '').trim();
+          const parentPhone = String(r[5] || '').trim();
+          const address = String(r[6] || '').trim();
+          const teamGroup = r[7] ? `Tổ ${String(r[7]).replace(/\D/g, '') || 1}` : 'Tổ 1';
+          const chucVu = String(r[8] || 'Thành viên').trim();
+          return { stt, fullName, dob, gender, parentName, parentPhone, address, teamGroup, chucVu };
+        }).filter(s => s.fullName && !s.fullName.toLowerCase().includes('họ và tên'));
+
+        // Làm sạch và đồng bộ lại danh sách lớp trong bảng students
+        await connection.query('DELETE FROM students WHERE class_id = ?', [classId]);
+
+        if (studentValues.length > 0) {
+          const insertStudents = studentValues.map(s => [
+            classId,
+            s.stt,
+            s.fullName,
+            s.dob,
+            s.gender,
+            s.parentName,
+            s.parentPhone,
+            s.address,
+            s.teamGroup
+          ]);
+          await connection.query(
+            'INSERT INTO students (class_id, stt, full_name, dob, gender, parent_name, parent_phone, address, team_group) VALUES ?',
+            [insertStudents]
+          );
+
+          // Cập nhật tbl_soyeulylich song song để dashboard sĩ số đồng bộ
+          await connection.query('DELETE FROM tbl_soyeulylich WHERE ma_lop = ?', [classId]);
+          const insertLegacy = studentValues.map(s => [
+            s.fullName,
+            s.dob,
+            s.gender,
+            s.parentName,
+            s.parentPhone,
+            s.address,
+            '',
+            Number(s.teamGroup.replace(/\D/g, '')) || 1,
+            s.chucVu,
+            classId
+          ]);
+          await connection.query(
+            'INSERT INTO tbl_soyeulylich (ho_ten, ngay_sinh, gioi_tinh, ho_ten_ph, so_dien_thoai, dia_chi, ghi_chu, to_so, chuc_vu_to, ma_lop) VALUES ?',
+            [insertLegacy]
+          );
+        }
+      }
+    }
+
+    await connection.commit();
+    await logActivity('MODULE_DOC_SAVE', `Lưu thành công phân hệ [${module_key}] cho lớp ${classId}`);
+    res.json({
+      success: true,
+      message: `Đã lưu thay đổi cho lớp [${classId}] thành công!`,
+      class_id: classId,
+      module_key,
+      version: 1,
+      updated_at: new Date().toISOString()
+    });
+  } catch (err) {
+    await connection.rollback();
+    console.error('Lỗi POST /api/modules/save:', err);
+    res.status(500).json({ error: err.message });
+  } finally {
+    connection.release();
   }
 });
 
