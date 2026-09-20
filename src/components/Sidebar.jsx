@@ -20,8 +20,8 @@ export default function Sidebar({
         isOpen ? 'translate-x-0' : '-translate-x-full absolute'
       } ${
         isDark 
-          ? 'bg-slate-900/95 border-slate-800 text-slate-200' 
-          : 'bg-white/95 border-slate-200 text-slate-800 shadow-xl'
+          ? 'bg-slate-900 border-slate-800 text-slate-200' 
+          : 'bg-white border-slate-200 text-slate-800 shadow-xl'
       }`}
     >
       <div className="overflow-y-auto p-4 space-y-6">
@@ -147,25 +147,41 @@ export default function Sidebar({
       </div>
 
       {/* FOOTER USER & LOGOUT */}
-      <div className="p-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-900/90">
-        <div className="flex items-center gap-2.5 mb-2.5 px-1">
-          <div className="w-8 h-8 rounded-full bg-cyan-500/10 dark:bg-slate-800 border border-cyan-500/30 dark:border-slate-700 flex items-center justify-center text-xs font-bold text-cyan-600 dark:text-cyan-400 shrink-0">
+      <div className={`p-4 border-t transition-colors duration-300 ${
+        isDark 
+          ? 'border-slate-800 bg-slate-900 text-slate-200' 
+          : 'border-slate-200 bg-white text-slate-800'
+      }`}>
+        <div className="flex items-center gap-2.5 mb-3 px-1">
+          <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 transition-colors ${
+            isDark 
+              ? 'bg-slate-800 border border-slate-700 text-cyan-400' 
+              : 'bg-cyan-50 border border-cyan-200 text-cyan-700 shadow-xs'
+          }`}>
             {currentUser?.fullName ? currentUser.fullName[0].toUpperCase() : 'GV'}
           </div>
           <div className="text-left overflow-hidden">
-            <p className="text-xs font-semibold text-slate-800 dark:text-slate-200 truncate">
+            <p className={`text-xs font-semibold truncate ${
+              isDark ? 'text-slate-200' : 'text-slate-900'
+            }`}>
               {currentUser?.fullName || 'Người dùng'}
             </p>
-            <p className="text-[10px] text-slate-500 truncate">
+            <p className={`text-[10px] truncate ${
+              isDark ? 'text-slate-400' : 'text-slate-500'
+            }`}>
               {currentUser?.email || 'gv@phucu.edu.vn'}
             </p>
           </div>
         </div>
         <button 
           onClick={onLogout} 
-          className="w-full flex items-center justify-center gap-2 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-400 rounded-xl transition text-xs font-semibold border border-red-500/20"
+          className={`w-full flex items-center justify-center gap-2 py-1.5 rounded-xl transition text-xs font-semibold border ${
+            isDark 
+              ? 'bg-red-500/10 hover:bg-red-500/20 text-red-400 border-red-500/20' 
+              : 'bg-red-50 hover:bg-red-100 text-red-600 border-red-200 hover:border-red-300 shadow-xs'
+          }`}
         >
-          <LogOut className="w-3.5 h-3.5" /> Đăng xuất
+          <LogOut className="w-3.5 h-3.5" /> <span>Đăng xuất</span>
         </button>
       </div>
     </aside>

@@ -234,8 +234,8 @@ export default function App() {
       className="min-h-screen text-slate-100 flex font-sans bg-cover bg-center bg-no-repeat bg-fixed relative overflow-x-hidden transition-colors duration-300"
       style={{ backgroundImage: `url('./bg-khaigiang.jpg')` }}
     >
-      {/* Lớp overlay phủ nền (Thích ứng Light / Dark qua class index.css) */}
-      {activeTab !== 'home' && (
+      {/* Lớp overlay phủ nền: Chỉ hiển thị ở Dark Mode, ở Light Mode hoàn toàn biến mất (trong suốt) */}
+      {activeTab !== 'home' && isDark && (
         <div className="fixed inset-0 bg-slate-950/80 pointer-events-none z-0 transition-colors duration-300" />
       )}
 
@@ -254,20 +254,30 @@ export default function App() {
       {/* Main Viewport */}
       <div className="flex-1 flex flex-col min-h-screen overflow-y-auto relative z-10">
         {/* TOP FLOATING HEADER TOOLBAR */}
-        <header className="sticky top-0 z-30 px-6 py-3.5 backdrop-blur-md border-b transition-colors duration-300 flex items-center justify-between gap-4 bg-slate-950/40 border-white/10 dark:bg-slate-950/60 dark:border-slate-800/80">
+        <header className={`sticky top-0 z-30 px-6 py-3.5 border-b transition-colors duration-300 flex items-center justify-between gap-4 ${
+          isDark 
+            ? 'backdrop-blur-md bg-slate-950/60 border-slate-800/80 text-white' 
+            : 'bg-white border-slate-200 text-slate-800 shadow-xs'
+        }`}>
           <div className="flex items-center gap-3">
             {/* Nút thu gọn / mở rộng Sidebar [<] [>] */}
             <button
               onClick={toggleSidebar}
               title={isSidebarOpen ? "Ẩn danh mục [<]" : "Mở danh mục [>]"}
-              className="p-2 rounded-xl border border-slate-700/80 bg-slate-900/80 text-cyan-400 hover:bg-slate-800 transition shadow-sm flex items-center gap-1.5"
+              className={`p-2 rounded-xl border transition shadow-xs flex items-center gap-1.5 ${
+                isDark 
+                  ? 'border-slate-700/80 bg-slate-900/80 text-cyan-400 hover:bg-slate-800' 
+                  : 'border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100 hover:text-cyan-600'
+              }`}
             >
               {isSidebarOpen ? <ChevronLeft className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
               <span className="text-[11px] font-mono font-bold pr-1">{isSidebarOpen ? '[<]' : '[>]'}</span>
             </button>
 
-            <span className="text-xs font-semibold tracking-wide text-slate-200 truncate hidden sm:inline">
-              Lớp <b className="text-cyan-400">{classState.className}</b> • {classState.schoolName}
+            <span className={`text-xs font-semibold tracking-wide truncate hidden sm:inline ${
+              isDark ? 'text-slate-200' : 'text-slate-700'
+            }`}>
+              Lớp <b className={isDark ? 'text-cyan-400' : 'text-cyan-600'}>{classState.className}</b> • {classState.schoolName}
             </span>
           </div>
 
