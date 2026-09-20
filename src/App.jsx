@@ -85,11 +85,20 @@ export default function App() {
   const [systemLogs, setSystemLogs] = useState([]);
   const [loadingLogs, setLoadingLogs] = useState(false);
 
-  // 6. State lớp học trung tâm
+  // 6. Quản lý Lớp học đang chọn (Multi-class Isolation)
+  const [selectedClass, setSelectedClass] = useState(() => {
+    try {
+      return localStorage.getItem('sotay_selected_class') || currentUser?.className || '10A1';
+    } catch {
+      return '10A1';
+    }
+  });
+
+  // 7. State lớp học trung tâm
   const [classState, setClassState] = useState({
     schoolName: 'TRƯỜNG THPT PHÙ CỪ',
     bookTitle: 'SỔ CÔNG TÁC CHỦ NHIỆM VÀ QUẢN LÝ HỌC SINH',
-    className: '10A1',
+    className: selectedClass,
     teacherName: '',
     teacherPhone: '',
     totalStudents: 0,
@@ -100,22 +109,25 @@ export default function App() {
 
   const REGULATION_URL = "https://thuvienphapluat.vn/van-ban/Giao-duc/Thong-tu-22-2021-TT-BGDDT-danh-gia-hoc-sinh-trung-hoc-co-so-485242.aspx";
 
-  // Hàm tải danh sách học sinh thật từ MySQL (/api/soyeulylich) để đồng bộ sĩ số toàn bộ hệ thống
-  const syncStudentsFromDb = async () => {
+  // Hàm tải danh sách học sinh thật từ MySQL (/api/soyeulylich) theo mã lớp
+  const syncStudentsFromDb = async (lop = selectedClass) => {
     try {
-      // Ưu tiên đọc từ bảng gốc tbl_soyeulylich
-      const res = await fetch('/api/soyeulylich');
+      const activeClass = lop || '10A1';
+      // Ưu tiên đọc từ bảng gốc tbl_soyeulylich theo mã lớp
+      const res = await fetch(`/api/soyeulylich?ma_lop=${encodeURIComponent(activeClass)}`);
       if (res.ok) {
         const data = await res.json();
-        if (Array.isArray(data) && data.length > 0) {
+        if (Array.isArray(data)) {
           setClassState(prev => ({
             ...prev,
+            className: activeClass,
             totalStudents: data.length,
             studentsList: data.map(st => ({
               id: st.id,
               name: st.ho_ten,
               to_so: st.to_so || 1,
               chuc_vu: st.chuc_vu_to || 'Thành viên',
+              ma_lop: st.ma_lop || activeClass,
               source: 'soyeulylich'
             }))
           }));
@@ -123,19 +135,21 @@ export default function App() {
         }
       }
 
-      // Fallback nếu soyeulylich chưa có dữ liệu
-      const res2 = await fetch('/api/to-hocsinh');
+      // Fallback nếu soyeulylich lỗi
+      const res2 = await fetch(`/api/to-hocsinh?ma_lop=${encodeURIComponent(activeClass)}`);
       if (res2.ok) {
         const data2 = await res2.json();
         if (Array.isArray(data2)) {
           setClassState(prev => ({
             ...prev,
+            className: activeClass,
             totalStudents: data2.length,
             studentsList: data2.map(st => ({
               id: st.id,
               name: st.ho_ten,
               to_so: st.to_so || 1,
               chuc_vu: st.chuc_vu_to || 'Thành viên',
+              ma_lop: st.ma_lop || activeClass,
               source: 'to_hocsinh'
             }))
           }));
@@ -146,18 +160,32 @@ export default function App() {
     }
   };
 
-  // Đồng bộ thông tin giáo viên và học sinh khi user đã đăng nhập
+  const handleSelectClass = (newClass) => {
+    if (!newClass) return;
+    const cleanClass = newClass.trim().toUpperCase();
+    setSelectedClass(cleanClass);
+    try {
+      localStorage.setItem('sotay_selected_class', cleanClass);
+    } catch {}
+    setClassState(prev => ({
+      ...prev,
+      className: cleanClass
+    }));
+    syncStudentsFromDb(cleanClass);
+  };
+
+  // Đồng bộ thông tin giáo viên và học sinh khi user đã đăng nhập hoặc đổi lớp
   useEffect(() => {
     if (currentUser) {
       setClassState(prev => ({
         ...prev,
         teacherName: currentUser.fullName || 'Giáo viên Chủ Nhiệm',
         teacherPhone: currentUser.phone || '',
-        className: currentUser.className || '10A1'
+        className: selectedClass
       }));
-      syncStudentsFromDb();
+      syncStudentsFromDb(selectedClass);
     }
-  }, [currentUser]);
+  }, [currentUser, selectedClass]);
 
   // Hàm tải logs từ MySQL khi ở Dev Console
   const fetchSystemLogs = async () => {
@@ -274,11 +302,56 @@ export default function App() {
               <span className="text-[11px] font-mono font-bold pr-1">{isSidebarOpen ? '[<]' : '[>]'}</span>
             </button>
 
-            <span className={`text-xs font-semibold tracking-wide truncate hidden sm:inline ${
-              isDark ? 'text-slate-200' : 'text-slate-700'
-            }`}>
-              Lớp <b className={isDark ? 'text-cyan-400' : 'text-cyan-600'}>{classState.className}</b> • {classState.schoolName}
-            </span>
+            {/* Class Selector Dropdown */}
+            <div className="flex items-center gap-2">
+              <span className={`text-xs font-semibold tracking-wide hidden md:inline ${
+                isDark ? 'text-slate-300' : 'text-slate-600'
+              }`}>
+                Lớp:
+              </span>
+              <select
+                value={selectedClass}
+                onChange={(e) => {
+                  if (e.target.value === 'custom') {
+                    const custom = prompt('Nhập mã lớp mới (VD: 10D5, 11B3...):');
+                    if (custom?.trim()) handleSelectClass(custom.trim().toUpperCase());
+                  } else {
+                    handleSelectClass(e.target.value);
+                  }
+                }}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold font-mono transition border cursor-pointer ${
+                  isDark
+                    ? 'bg-slate-900 border-cyan-500/40 text-cyan-400 hover:border-cyan-400 focus:ring-2 focus:ring-cyan-500/30'
+                    : 'bg-cyan-50 border-cyan-300 text-cyan-800 hover:bg-cyan-100 focus:ring-2 focus:ring-cyan-500/20 shadow-xs'
+                }`}
+                title="Chọn lớp để lọc và hiển thị dữ liệu riêng biệt"
+              >
+                <optgroup label="Khối 10">
+                  {['10A1', '10A2', '10A3', '10A4', '10D1', '10D2', '10D4'].map(c => (
+                    <option key={c} value={c}>Lớp {c}</option>
+                  ))}
+                </optgroup>
+                <optgroup label="Khối 11">
+                  {['11A1', '11A2', '11D1', '11D2'].map(c => (
+                    <option key={c} value={c}>Lớp {c}</option>
+                  ))}
+                </optgroup>
+                <optgroup label="Khối 12">
+                  {['12A1', '12A2', '12D1', '12D2'].map(c => (
+                    <option key={c} value={c}>Lớp {c}</option>
+                  ))}
+                </optgroup>
+                {!['10A1', '10A2', '10A3', '10A4', '10D1', '10D2', '10D4', '11A1', '11A2', '11D1', '11D2', '12A1', '12A2', '12D1', '12D2'].includes(selectedClass) && (
+                  <option value={selectedClass}>Lớp {selectedClass}</option>
+                )}
+                <option value="custom">+ Thêm / Đổi lớp khác...</option>
+              </select>
+              <span className={`text-xs font-normal tracking-wide hidden lg:inline ${
+                isDark ? 'text-slate-400' : 'text-slate-500'
+              }`}>
+                • {classState.schoolName}
+              </span>
+            </div>
           </div>
 
           {/* Công cụ trạng thái MySQL và Đổi Theme */}
@@ -392,7 +465,7 @@ export default function App() {
                   <h3 className="text-sm font-bold text-white">Danh sách học sinh lớp {classState.className}</h3>
                   <button 
                     onClick={async () => {
-                      const name = prompt('Nhập họ tên học sinh mới:');
+                      const name = prompt(`Nhập họ tên học sinh mới cho lớp ${selectedClass}:`);
                       if (name?.trim()) {
                         try {
                           const res = await fetch('/api/soyeulylich', {
@@ -401,11 +474,12 @@ export default function App() {
                             body: JSON.stringify({
                               to_so: 1,
                               ho_ten: name.trim(),
-                              chuc_vu_to: 'Thành viên'
+                              chuc_vu_to: 'Thành viên',
+                              ma_lop: selectedClass
                             })
                           });
                           if (res.ok) {
-                            syncStudentsFromDb();
+                            syncStudentsFromDb(selectedClass);
                           } else {
                             // Fallback to-hocsinh
                             await fetch('/api/to-hocsinh', {
@@ -414,10 +488,11 @@ export default function App() {
                               body: JSON.stringify({
                                 to_so: 1,
                                 ho_ten: name.trim(),
-                                chuc_vu_to: 'Thành viên'
+                                chuc_vu_to: 'Thành viên',
+                                ma_lop: selectedClass
                               })
                             });
-                            syncStudentsFromDb();
+                            syncStudentsFromDb(selectedClass);
                           }
                         } catch (e) {
                           alert('Lỗi lưu học sinh vào MySQL: ' + e.message);
@@ -446,7 +521,7 @@ export default function App() {
                               const endpoint = st.source === 'soyeulylich' ? `/api/soyeulylich/${st.id}` : `/api/to-hocsinh/${st.id}`;
                               const res = await fetch(endpoint, { method: 'DELETE' });
                               if (res.ok) {
-                                syncStudentsFromDb();
+                                syncStudentsFromDb(selectedClass);
                               }
                             } catch (e) {
                               alert('Lỗi xóa học sinh: ' + e.message);
@@ -491,8 +566,8 @@ export default function App() {
             </div>
           )}
 
-          {/* 4. RENDER CÁC COG MODULE (TỰ ĐỘNG KHỚP THEO REGISTRY) */}
-          {ActiveComponent && <ActiveComponent classData={classState} />}
+          {/* 4. RENDER CÁC COG MODULE (TỰ ĐỘNG KHỚP THEO REGISTRY VÀ LỌC THEO MÃ LỚP) */}
+          {ActiveComponent && <ActiveComponent classData={classState} maLop={selectedClass} />}
 
           {/* 5. DEV CONSOLE (Hiển thị thông số Cogs + Logs thật từ MySQL) */}
           {activeTab === 'dev_panel' && currentUser.role === 'developer' && (

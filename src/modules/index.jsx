@@ -13,8 +13,9 @@ import { parseDocxLines, exportDocxTable } from '../utils/wordHandler';
 // PHÂN HỆ 1: TỔ CHỨC & HỒ SƠ LỚP (4 MODULES)
 // =========================================================================
 
-// 1. SƠ YẾU LÝ LỊCH HỌC SINH (KẾT NỐI TRỰC TIẾP MYSQL + EXCEL BATCH)
-export function LyLichHocSinh() {
+// 1. SƠ YẾU LÝ LỊCH HỌC SINH (KẾT NỐI TRỰC TIẾP MYSQL + EXCEL BATCH THEO LỚP)
+export function LyLichHocSinh({ maLop, classData }) {
+  const currentLop = maLop || classData?.className || '10A1';
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(false);
   const [fileName, setFileName] = useState('');
@@ -34,7 +35,7 @@ export function LyLichHocSinh() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/soyeulylich');
+      const res = await fetch(`/api/soyeulylich?ma_lop=${encodeURIComponent(currentLop)}`);
       if (res.ok) {
         const data = await res.json();
         setStudents(Array.isArray(data) ? data : []);
@@ -48,7 +49,7 @@ export function LyLichHocSinh() {
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [currentLop]);
 
   const handleAddStudent = async (e) => {
     e.preventDefault();
@@ -57,7 +58,7 @@ export function LyLichHocSinh() {
       const res = await fetch('/api/soyeulylich', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form)
+        body: JSON.stringify({ ...form, ma_lop: currentLop })
       });
       if (res.ok) {
         setForm({
@@ -94,7 +95,7 @@ export function LyLichHocSinh() {
   };
 
   const handleDeleteStudent = async (id, name) => {
-    if (!window.confirm(`Xác nhận xóa hồ sơ học sinh "${name}" khỏi cơ sở dữ liệu?`)) return;
+    if (!window.confirm(`Xác nhận xóa hồ sơ học sinh "${name}" khỏi cơ sở dữ liệu lớp ${currentLop}?`)) return;
     try {
       const res = await fetch(`/api/soyeulylich/${id}`, { method: 'DELETE' });
       if (res.ok) {
@@ -106,9 +107,9 @@ export function LyLichHocSinh() {
   };
 
   const handleClearAll = async () => {
-    if (!window.confirm('CẢNH BÁO: Thao tác này sẽ XÓA TOÀN BỘ danh sách học sinh trên MySQL server. Bạn có chắc chắn không?')) return;
+    if (!window.confirm(`CẢNH BÁO: Thao tác này sẽ XÓA TOÀN BỘ học sinh của LỚP ${currentLop} trên MySQL. Các lớp khác sẽ KHÔNG bị ảnh hưởng. Bạn có chắc chắn không?`)) return;
     try {
-      const res = await fetch('/api/soyeulylich', { method: 'DELETE' });
+      const res = await fetch(`/api/soyeulylich?ma_lop=${encodeURIComponent(currentLop)}`, { method: 'DELETE' });
       if (res.ok) {
         setStudents([]);
         setFileName('');
@@ -147,7 +148,8 @@ export function LyLichHocSinh() {
               so_dien_thoai: String(r[5] || '').trim(),
               dia_chi: String(r[6] || '').trim(),
               to_so: Number(r[7]) || 1,
-              chuc_vu_to: String(r[8] || 'Thành viên').trim()
+              chuc_vu_to: String(r[8] || 'Thành viên').trim(),
+              ma_lop: currentLop
             };
           }).filter(s => s.ho_ten && s.ho_ten.length > 1 && !s.ho_ten.toLowerCase().includes('họ và tên'));
 
@@ -155,10 +157,10 @@ export function LyLichHocSinh() {
             const res = await fetch('/api/soyeulylich/batch', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ students: parsed })
+              body: JSON.stringify({ students: parsed, ma_lop: currentLop })
             });
             if (res.ok) {
-              alert(`Nhập thành công ${parsed.length} học sinh từ file Excel vào MySQL!`);
+              alert(`Nhập thành công ${parsed.length} học sinh cho lớp ${currentLop} từ file Excel vào MySQL!`);
               loadData();
             } else {
               alert('Máy chủ báo lỗi khi lưu hàng loạt vào MySQL.');
@@ -440,20 +442,21 @@ export function LyLichHocSinh() {
 }
 
 // 2. BAN ĐẠI DIỆN HỘI CHA MẸ HỌC SINH (WORD .DOCX + CRUD)
-export function BanDaiDienPHHS() {
+export function BanDaiDienPHHS({ maLop, classData }) {
+  const currentLop = maLop || classData?.className || '10A1';
   const [list, setList] = useState([]);
   const [editingId, setEditingId] = useState(null);
   const [editForm, setEditForm] = useState({});
   const [form, setForm] = useState({ ho_ten_ph: '', phu_huynh_em: '', chuc_vu: 'Thành viên', so_dien_thoai: '', dia_chi: '' });
 
   const loadData = () => {
-    fetch('/api/phuhuynh')
+    fetch(`/api/phuhuynh?ma_lop=${encodeURIComponent(currentLop)}`)
       .then(r => r.json())
       .then(data => setList(Array.isArray(data) ? data : []))
       .catch(console.error);
   };
 
-  useEffect(() => { loadData(); }, []);
+  useEffect(() => { loadData(); }, [currentLop]);
 
   const handleCreate = async (e) => {
     e.preventDefault();
@@ -461,7 +464,7 @@ export function BanDaiDienPHHS() {
     await fetch('/api/phuhuynh', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(form)
+      body: JSON.stringify({ ...form, ma_lop: currentLop })
     });
     setForm({ ho_ten_ph: '', phu_huynh_em: '', chuc_vu: 'Thành viên', so_dien_thoai: '', dia_chi: '' });
     loadData();
@@ -498,7 +501,8 @@ export function BanDaiDienPHHS() {
             phu_huynh_em: parts[1] || '',
             chuc_vu: parts[2] || 'Thành viên',
             so_dien_thoai: parts[3] || '',
-            dia_chi: parts[4] || ''
+            dia_chi: parts[4] || '',
+            ma_lop: currentLop
           })
         });
       }
@@ -517,7 +521,7 @@ export function BanDaiDienPHHS() {
   };
 
   return (
-    <ModuleContainer title="BAN ĐẠI DIỆN HỘI CHA MẸ HỌC SINH" desc="Quản lý Ban đại diện PHHS (Nhập / Xuất Word .docx)">
+    <ModuleContainer title="BAN ĐẠI DIỆN HỘI CHA MẸ HỌC SINH" desc={`Quản lý Ban đại diện PHHS lớp ${currentLop} (Nhập / Xuất Word .docx)`}>
       <div className="flex flex-wrap items-center justify-between gap-3 p-4 bg-slate-950/60 border border-slate-800 rounded-xl mb-4">
         <div className="flex gap-2">
           <label className="cursor-pointer px-3.5 py-2 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 transition">
@@ -605,20 +609,21 @@ export function BanDaiDienPHHS() {
 }
 
 // 3. CÁN BỘ ĐOÀN & CÁN BỘ LỚP (WORD .DOCX + CRUD)
-export function CanBoLopDoan() {
+export function CanBoLopDoan({ maLop, classData }) {
+  const currentLop = maLop || classData?.className || '10A1';
   const [list, setList] = useState([]);
   const [editingId, setEditingId] = useState(null);
   const [editForm, setEditForm] = useState({});
   const [form, setForm] = useState({ chuc_vu: '', ho_ten: '', nhiem_vu: '', so_dien_thoai: '', loai_can_bo: 'LOP' });
 
   const loadData = () => {
-    fetch('/api/canbo')
+    fetch(`/api/canbo?ma_lop=${encodeURIComponent(currentLop)}`)
       .then(r => r.json())
       .then(data => setList(Array.isArray(data) ? data : []))
       .catch(console.error);
   };
 
-  useEffect(() => { loadData(); }, []);
+  useEffect(() => { loadData(); }, [currentLop]);
 
   const handleCreate = async (e) => {
     e.preventDefault();
@@ -626,7 +631,7 @@ export function CanBoLopDoan() {
     await fetch('/api/canbo', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(form)
+      body: JSON.stringify({ ...form, ma_lop: currentLop })
     });
     setForm({ chuc_vu: '', ho_ten: '', nhiem_vu: '', so_dien_thoai: '', loai_can_bo: 'LOP' });
     loadData();
@@ -663,7 +668,8 @@ export function CanBoLopDoan() {
             chuc_vu: parts[1] || 'Cán bộ',
             ho_ten: parts[2] || parts[0],
             nhiem_vu: parts[3] || '',
-            so_dien_thoai: parts[4] || ''
+            so_dien_thoai: parts[4] || '',
+            ma_lop: currentLop
           })
         });
       }
@@ -782,7 +788,8 @@ export function CanBoLopDoan() {
 }
 
 // 4. SƠ ĐỒ LỚP HỌC & CHIA TỔ (DÙNG CHUNG BẢNG HỌC SINH VỚI SƠ YẾU LÝ LỊCH)
-export function SoDoLopHoc() {
+export function SoDoLopHoc({ maLop, classData }) {
+  const currentLop = maLop || classData?.className || '10A1';
   const [students, setStudents] = useState([]);
   const [toSo, setToSo] = useState(1);
   const [hoTen, setHoTen] = useState('');
@@ -792,7 +799,7 @@ export function SoDoLopHoc() {
 
   const loadData = async () => {
     try {
-      const res = await fetch('/api/soyeulylich');
+      const res = await fetch(`/api/soyeulylich?ma_lop=${encodeURIComponent(currentLop)}`);
       if (res.ok) {
         const data = await res.json();
         if (Array.isArray(data) && data.length > 0) {
@@ -801,17 +808,19 @@ export function SoDoLopHoc() {
         }
       }
       // Fallback nếu soyeulylich rỗng
-      const res2 = await fetch('/api/to-hocsinh');
+      const res2 = await fetch(`/api/to-hocsinh?ma_lop=${encodeURIComponent(currentLop)}`);
       if (res2.ok) {
         const data2 = await res2.json();
         setStudents(Array.isArray(data2) ? data2 : []);
+      } else {
+        setStudents([]);
       }
     } catch (e) {
       console.error('Lỗi tải danh sách chia tổ:', e);
     }
   };
 
-  useEffect(() => { loadData(); }, []);
+  useEffect(() => { loadData(); }, [currentLop]);
 
   const handleAddHS = async (e) => {
     e.preventDefault();
@@ -820,7 +829,7 @@ export function SoDoLopHoc() {
       await fetch('/api/soyeulylich', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ho_ten: hoTen.trim(), to_so: toSo, chuc_vu_to: chucVu })
+        body: JSON.stringify({ ho_ten: hoTen.trim(), to_so: toSo, chuc_vu_to: chucVu, ma_lop: currentLop })
       });
       setHoTen('');
       loadData();
@@ -867,7 +876,8 @@ export function SoDoLopHoc() {
             to_so: parseInt(parts[0]) || 1,
             ho_ten: parts[1],
             chuc_vu_to: parts[2] || 'Thành viên',
-            ghi_chu: parts[3] || ''
+            ghi_chu: parts[3] || '',
+            ma_lop: currentLop
           })
         });
       }
@@ -878,10 +888,10 @@ export function SoDoLopHoc() {
 
   const handleExportWord = () => {
     exportDocxTable({
-      title: 'DANH SÁCH HỌC SINH THEO TỔ',
+      title: `DANH SÁCH HỌC SINH THEO TỔ - LỚP ${currentLop}`,
       headers: ['STT', 'Tổ số', 'Họ và tên học sinh', 'Chức vụ trong tổ', 'Ghi chú'],
       rows: students.map((it, idx) => [idx + 1, `Tổ ${it.to_so || 1}`, it.ho_ten, it.chuc_vu_to || 'Thành viên', it.ghi_chu || '']),
-      filename: 'Danh_Sach_Chia_To'
+      filename: `Danh_Sach_Chia_To_${currentLop}`
     });
   };
 
@@ -985,29 +995,34 @@ export function SoDoLopHoc() {
 // =========================================================================
 
 // 5. THỜI KHÓA BIỂU 2 BUỔI (WORD .DOCX + CRUD)
-export function ThoiKhoaBieu() {
+export function ThoiKhoaBieu({ maLop, classData }) {
+  const currentLop = maLop || classData?.className || '10A1';
   const [schedule, setSchedule] = useState([]);
   const [editingId, setEditingId] = useState(null);
   const [editRow, setEditRow] = useState({});
   const [newRow, setNewRow] = useState({ buoi: 'SANG', tiet: 1, thu_2: '', thu_3: '', thu_4: '', thu_5: '', thu_6: '', thu_7: '' });
 
   const loadData = () => {
-    fetch('/api/tkb/init', { method: 'POST' }).then(() => {
-      fetch('/api/tkb')
+    fetch('/api/tkb/init', { 
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ma_lop: currentLop })
+    }).then(() => {
+      fetch(`/api/tkb?ma_lop=${encodeURIComponent(currentLop)}`)
         .then(r => r.json())
         .then(data => setSchedule(Array.isArray(data) ? data : []))
         .catch(console.error);
     });
   };
 
-  useEffect(() => { loadData(); }, []);
+  useEffect(() => { loadData(); }, [currentLop]);
 
   const handleCreatePeriod = async (e) => {
     e.preventDefault();
     await fetch('/api/tkb', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(newRow)
+      body: JSON.stringify({ ...newRow, ma_lop: currentLop })
     });
     setNewRow({ buoi: 'SANG', tiet: schedule.length + 1, thu_2: '', thu_3: '', thu_4: '', thu_5: '', thu_6: '', thu_7: '' });
     loadData();
@@ -1047,7 +1062,8 @@ export function ThoiKhoaBieu() {
             thu_4: parts[4] || '',
             thu_5: parts[5] || '',
             thu_6: parts[6] || '',
-            thu_7: parts[7] || ''
+            thu_7: parts[7] || '',
+            ma_lop: currentLop
           })
         });
       }
@@ -1058,10 +1074,10 @@ export function ThoiKhoaBieu() {
 
   const handleExportWord = () => {
     exportDocxTable({
-      title: 'THỜI KHÓA BIỂU TOÀN TRƯỜNG',
+      title: `THỜI KHÓA BIỂU LỚP ${currentLop}`,
       headers: ['Buổi', 'Tiết', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'],
       rows: schedule.map(row => [row.buoi === 'SANG' ? 'Sáng' : 'Chiều', `Tiết ${row.tiet}`, row.thu_2, row.thu_3, row.thu_4, row.thu_5, row.thu_6, row.thu_7]),
-      filename: 'Thoi_Khoa_Bieu'
+      filename: `Thoi_Khoa_Bieu_${currentLop}`
     });
   };
 
@@ -1147,7 +1163,8 @@ export function ThoiKhoaBieu() {
 }
 
 // 6. THEO DÕI HỌC TẬP & RÈN LUYỆN (WORD .DOCX + CRUD)
-export function TheoDoiHocTap() {
+export function TheoDoiHocTap({ maLop, classData }) {
+  const currentLop = maLop || classData?.className || '10A1';
   const [list, setList] = useState([]);
   const [studentOptions, setStudentOptions] = useState([]);
   const [editingId, setEditingId] = useState(null);
@@ -1161,18 +1178,18 @@ export function TheoDoiHocTap() {
   });
 
   const loadData = () => {
-    fetch('/api/theodoi')
+    fetch(`/api/theodoi?ma_lop=${encodeURIComponent(currentLop)}`)
       .then(r => r.json())
       .then(data => setList(Array.isArray(data) ? data : []))
       .catch(console.error);
 
-    fetch('/api/soyeulylich')
+    fetch(`/api/soyeulylich?ma_lop=${encodeURIComponent(currentLop)}`)
       .then(r => r.json())
       .then(data => { if (Array.isArray(data)) setStudentOptions(data); })
       .catch(() => {});
   };
 
-  useEffect(() => { loadData(); }, []);
+  useEffect(() => { loadData(); }, [currentLop]);
 
   const handleCreate = async (e) => {
     e.preventDefault();
@@ -1180,7 +1197,7 @@ export function TheoDoiHocTap() {
     await fetch('/api/theodoi', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(form)
+      body: JSON.stringify({ ...form, ma_lop: currentLop })
     });
     setForm({ ngay_thang: new Date().toISOString().slice(0, 10), ho_ten: '', mon_hoc: '', diem_nhan_xet: '', vi_pham_khen_thuong: '' });
     loadData();
@@ -1217,7 +1234,8 @@ export function TheoDoiHocTap() {
             ho_ten: parts[1],
             mon_hoc: parts[2] || '',
             diem_nhan_xet: parts[3] || '',
-            vi_pham_khen_thuong: parts[4] || ''
+            vi_pham_khen_thuong: parts[4] || '',
+            ma_lop: currentLop
           })
         });
       }
@@ -1228,10 +1246,10 @@ export function TheoDoiHocTap() {
 
   const handleExportWord = () => {
     exportDocxTable({
-      title: 'SỔ THEO DÕI HỌC TẬP VÀ RÈN LUYỆN',
+      title: `SỔ THEO DÕI HỌC TẬP VÀ RÈN LUYỆN - LỚP ${currentLop}`,
       headers: ['STT', 'Ngày', 'Họ và tên học sinh', 'Môn học', 'Điểm / Nhận xét', 'Vi phạm / Khen thưởng'],
       rows: list.map((it, idx) => [idx + 1, it.ngay_thang ? String(it.ngay_thang).slice(0, 10) : '', it.ho_ten, it.mon_hoc, it.diem_nhan_xet, it.vi_pham_khen_thuong]),
-      filename: 'Theo_Doi_Hoc_Tap'
+      filename: `Theo_Doi_Hoc_Tap_${currentLop}`
     });
   };
 
@@ -1334,7 +1352,8 @@ export function TheoDoiHocTap() {
 }
 
 // 7. GIÁO DỤC HỌC SINH CÁ BIỆT (WORD .DOCX + CRUD)
-export function GiaoDucCaBiet() {
+export function GiaoDucCaBiet({ maLop, classData }) {
+  const currentLop = maLop || classData?.className || '10A1';
   const [list, setList] = useState([]);
   const [studentOptions, setStudentOptions] = useState([]);
   const [editingId, setEditingId] = useState(null);
@@ -1342,18 +1361,18 @@ export function GiaoDucCaBiet() {
   const [form, setForm] = useState({ ho_ten: '', bieu_hien: '', bien_phap: '', xac_nhan_ph: 'Chưa ký' });
 
   const loadData = () => {
-    fetch('/api/cabiet')
+    fetch(`/api/cabiet?ma_lop=${encodeURIComponent(currentLop)}`)
       .then(r => r.json())
       .then(data => setList(Array.isArray(data) ? data : []))
       .catch(console.error);
 
-    fetch('/api/soyeulylich')
+    fetch(`/api/soyeulylich?ma_lop=${encodeURIComponent(currentLop)}`)
       .then(r => r.json())
       .then(data => { if (Array.isArray(data)) setStudentOptions(data); })
       .catch(() => {});
   };
 
-  useEffect(() => { loadData(); }, []);
+  useEffect(() => { loadData(); }, [currentLop]);
 
   const handleCreate = async (e) => {
     e.preventDefault();
@@ -1361,7 +1380,7 @@ export function GiaoDucCaBiet() {
     await fetch('/api/cabiet', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(form)
+      body: JSON.stringify({ ...form, ma_lop: currentLop })
     });
     setForm({ ho_ten: '', bieu_hien: '', bien_phap: '', xac_nhan_ph: 'Chưa ký' });
     loadData();
@@ -1397,7 +1416,8 @@ export function GiaoDucCaBiet() {
             ho_ten: parts[0],
             bieu_hien: parts[1] || '',
             bien_phap: parts[2] || '',
-            xac_nhan_ph: parts[3] || 'Chưa ký'
+            xac_nhan_ph: parts[3] || 'Chưa ký',
+            ma_lop: currentLop
           })
         });
       }
@@ -1408,10 +1428,10 @@ export function GiaoDucCaBiet() {
 
   const handleExportWord = () => {
     exportDocxTable({
-      title: 'HỒ SƠ GIÁO DỤC HỌC SINH CÁ BIỆT',
-      headers: ['STT', 'Họ và tên học sinh', 'Biểu hiện vi phạm', 'Biện pháp giáo dục của GVCN', 'Xác nhận của PHHS'],
+      title: `KẾ HOẠCH GIÁO DỤC HỌC SINH CÁ BIỆT - LỚP ${currentLop}`,
+      headers: ['STT', 'Họ và tên học sinh', 'Biểu hiện cụ thể', 'Biện pháp giáo dục', 'Xác nhận của PHHS'],
       rows: list.map((it, idx) => [idx + 1, it.ho_ten, it.bieu_hien, it.bien_phap, it.xac_nhan_ph]),
-      filename: 'Giao_Duc_Hoc_Sinh_Ca_Biet'
+      filename: `Giao_Duc_Ca_Biet_${currentLop}`
     });
   };
 
@@ -1520,7 +1540,8 @@ export function GiaoDucCaBiet() {
 }
 
 // 8. NỘI DUNG SINH HOẠT LỚP (WORD .DOCX + CRUD)
-export function SinhHoatLop() {
+export function SinhHoatLop({ maLop, classData }) {
+  const currentLop = maLop || classData?.className || '10A1';
   const [list, setList] = useState([]);
   const [editingId, setEditingId] = useState(null);
   const [editForm, setEditForm] = useState({});
@@ -1533,20 +1554,20 @@ export function SinhHoatLop() {
   });
 
   const loadData = () => {
-    fetch('/api/sinhhoat')
+    fetch(`/api/sinhhoat?ma_lop=${encodeURIComponent(currentLop)}`)
       .then(r => r.json())
       .then(data => setList(Array.isArray(data) ? data : []))
       .catch(console.error);
   };
 
-  useEffect(() => { loadData(); }, []);
+  useEffect(() => { loadData(); }, [currentLop]);
 
   const handleCreate = async (e) => {
     e.preventDefault();
     await fetch('/api/sinhhoat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(form)
+      body: JSON.stringify({ ...form, ma_lop: currentLop })
     });
     setForm({ tuan: (parseInt(form.tuan) || 0) + 1, ngay_hop: new Date().toISOString().slice(0, 10), danh_gia: '', phuong_huong: '', tuyen_duong: '' });
     loadData();
@@ -1583,7 +1604,8 @@ export function SinhHoatLop() {
             ngay_hop: parts[1] || new Date().toISOString().slice(0, 10),
             danh_gia: parts[2] || '',
             phuong_huong: parts[3] || '',
-            tuyen_duong: parts[4] || ''
+            tuyen_duong: parts[4] || '',
+            ma_lop: currentLop
           })
         });
       }
@@ -1594,10 +1616,10 @@ export function SinhHoatLop() {
 
   const handleExportWord = () => {
     exportDocxTable({
-      title: 'BIÊN BẢN & NỘI DUNG SINH HOẠT LỚP HÀNG TUẦN',
+      title: `BIÊN BẢN & NỘI DUNG SINH HOẠT LỚP HÀNG TUẦN - LỚP ${currentLop}`,
       headers: ['Tuần', 'Ngày họp', 'Đánh giá hoạt động tuần qua', 'Phương hướng kế hoạch tuần tới', 'Tuyên dương'],
       rows: list.map(it => [`Tuần ${it.tuan}`, it.ngay_hop ? String(it.ngay_hop).slice(0, 10) : '', it.danh_gia, it.phuong_huong, it.tuyen_duong]),
-      filename: 'Bien_Ban_Sinh_Hoat_Lop'
+      filename: `Bien_Ban_Sinh_Hoat_Lop_${currentLop}`
     });
   };
 
@@ -1706,7 +1728,8 @@ export function SinhHoatLop() {
 // =========================================================================
 
 // 9. TỔNG HỢP XẾP LOẠI THEO THÔNG TƯ 22 (WORD .DOCX + CRUD + ĐỒNG BỘ HS GỐC)
-export function DanhGiaTT22() {
+export function DanhGiaTT22({ maLop, classData }) {
+  const currentLop = maLop || classData?.className || '10A1';
   const [list, setList] = useState([]);
   const [studentOptions, setStudentOptions] = useState([]);
   const [syncing, setSyncing] = useState(false);
@@ -1721,26 +1744,26 @@ export function DanhGiaTT22() {
   });
 
   const loadData = () => {
-    fetch('/api/tt22')
+    fetch(`/api/tt22?ma_lop=${encodeURIComponent(currentLop)}`)
       .then(r => r.json())
       .then(data => setList(Array.isArray(data) ? data : []))
       .catch(console.error);
 
-    fetch('/api/soyeulylich')
+    fetch(`/api/soyeulylich?ma_lop=${encodeURIComponent(currentLop)}`)
       .then(r => r.json())
       .then(data => { if (Array.isArray(data)) setStudentOptions(data); })
       .catch(() => {});
   };
 
-  useEffect(() => { loadData(); }, []);
+  useEffect(() => { loadData(); }, [currentLop]);
 
   const handleSyncFromLyLich = async () => {
     try {
       setSyncing(true);
-      const res = await fetch('/api/soyeulylich');
+      const res = await fetch(`/api/soyeulylich?ma_lop=${encodeURIComponent(currentLop)}`);
       const allStudents = await res.json();
       if (!Array.isArray(allStudents) || allStudents.length === 0) {
-        alert('Chưa có học sinh nào trong Sơ yếu lý lịch để đồng bộ! Vui lòng nhập hoặc tải file Excel ở module Sơ yếu lý lịch trước.');
+        alert(`Chưa có học sinh nào trong Sơ yếu lý lịch của lớp ${currentLop} để đồng bộ! Vui lòng nhập hoặc tải file Excel ở module Sơ yếu lý lịch trước.`);
         setSyncing(false);
         return;
       }
@@ -1749,7 +1772,7 @@ export function DanhGiaTT22() {
       const toAdd = allStudents.filter(s => s.ho_ten && !existingNames.has(s.ho_ten.trim().toLowerCase()));
       
       if (toAdd.length === 0) {
-        alert(`Tất cả ${allStudents.length} học sinh trong Sơ yếu lý lịch đã có đầy đủ trong bảng Đánh giá TT22!`);
+        alert(`Tất cả ${allStudents.length} học sinh trong Sơ yếu lý lịch lớp ${currentLop} đã có đầy đủ trong bảng Đánh giá TT22!`);
         setSyncing(false);
         return;
       }
@@ -1763,11 +1786,12 @@ export function DanhGiaTT22() {
             hk1_ht: 'Tốt',
             hk1_rl: 'Tốt',
             cn_ht: 'Tốt',
-            danh_hieu: 'Học sinh Tiên tiến'
+            danh_hieu: 'Học sinh Tiên tiến',
+            ma_lop: currentLop
           })
         });
       }
-      alert(`Đã đồng bộ thành công ${toAdd.length} học sinh từ Sơ yếu lý lịch vào bảng Đánh giá TT22!`);
+      alert(`Đã đồng bộ thành công ${toAdd.length} học sinh từ Sơ yếu lý lịch lớp ${currentLop} vào bảng Đánh giá TT22!`);
       loadData();
     } catch (err) {
       alert('Lỗi đồng bộ: ' + err.message);
@@ -1782,7 +1806,7 @@ export function DanhGiaTT22() {
     await fetch('/api/tt22', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(form)
+      body: JSON.stringify({ ...form, ma_lop: currentLop })
     });
     setForm({ ho_ten: '', hk1_ht: 'Tốt', hk1_rl: 'Tốt', cn_ht: 'Tốt', danh_hieu: 'Học sinh Xuất sắc' });
     loadData();
@@ -1819,7 +1843,8 @@ export function DanhGiaTT22() {
             hk1_ht: parts[1] || 'Đạt',
             hk1_rl: parts[2] || 'Tốt',
             cn_ht: parts[3] || 'Đạt',
-            danh_hieu: parts[4] || 'Học sinh Tiên tiến'
+            danh_hieu: parts[4] || 'Học sinh Tiên tiến',
+            ma_lop: currentLop
           })
         });
       }
@@ -1830,10 +1855,10 @@ export function DanhGiaTT22() {
 
   const handleExportWord = () => {
     exportDocxTable({
-      title: 'TỔNG HỢP ĐÁNH GIÁ XẾP LOẠI THEO THÔNG TƯ 22',
+      title: `TỔNG HỢP ĐÁNH GIÁ XẾP LOẠI THEO THÔNG TƯ 22 - LỚP ${currentLop}`,
       headers: ['STT', 'Họ và tên', 'Học tập HK1', 'Rèn luyện HK1', 'Học tập Cả năm', 'Danh hiệu'],
       rows: list.map((it, idx) => [idx + 1, it.ho_ten, it.hk1_ht, it.hk1_rl, it.cn_ht, it.danh_hieu]),
-      filename: 'Tong_Hop_Danh_Gia_TT22'
+      filename: `Tong_Hop_Danh_Gia_TT22_${currentLop}`
     });
   };
 
@@ -1963,27 +1988,28 @@ export function DanhGiaTT22() {
 }
 
 // 10. XẾP LOẠI THI ĐUA ĐOÀN TRƯỜNG (WORD .DOCX + CRUD)
-export function ThiDuaLop() {
+export function ThiDuaLop({ maLop, classData }) {
+  const currentLop = maLop || classData?.className || '10A1';
   const [list, setList] = useState([]);
   const [editingId, setEditingId] = useState(null);
   const [editForm, setEditForm] = useState({});
   const [form, setForm] = useState({ tuan: 1, diem_so: 100, hang_khoi: 1, hang_truong: 1, co_thi_dua: 'Cờ Nhất' });
 
   const loadData = () => {
-    fetch('/api/thidua')
+    fetch(`/api/thidua?ma_lop=${encodeURIComponent(currentLop)}`)
       .then(r => r.json())
       .then(data => setList(Array.isArray(data) ? data : []))
       .catch(console.error);
   };
 
-  useEffect(() => { loadData(); }, []);
+  useEffect(() => { loadData(); }, [currentLop]);
 
   const handleCreate = async (e) => {
     e.preventDefault();
     await fetch('/api/thidua', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(form)
+      body: JSON.stringify({ ...form, ma_lop: currentLop })
     });
     setForm({ tuan: (parseInt(form.tuan) || 0) + 1, diem_so: 100, hang_khoi: 1, hang_truong: 1, co_thi_dua: 'Cờ Nhất' });
     loadData();
@@ -2020,7 +2046,8 @@ export function ThiDuaLop() {
             diem_so: parseFloat(parts[1]) || 100,
             hang_khoi: parseInt(parts[2]) || 1,
             hang_truong: parseInt(parts[3]) || 1,
-            co_thi_dua: parts[4] || ''
+            co_thi_dua: parts[4] || '',
+            ma_lop: currentLop
           })
         });
       }
@@ -2031,10 +2058,10 @@ export function ThiDuaLop() {
 
   const handleExportWord = () => {
     exportDocxTable({
-      title: 'BẢNG XẾP LOẠI THI ĐUA ĐOÀN TRƯỜNG',
+      title: `BẢNG XẾP LOẠI THI ĐUA ĐOÀN TRƯỜNG - LỚP ${currentLop}`,
       headers: ['Tuần', 'Điểm số', 'Xếp hạng Khối', 'Hạng Toàn trường', 'Cờ thi đua'],
       rows: list.map(it => [`Tuần ${it.tuan}`, it.diem_so, it.hang_khoi, it.hang_truong, it.co_thi_dua]),
-      filename: 'Thi_Dua_Doan_Truong'
+      filename: `Thi_Dua_Doan_Truong_${currentLop}`
     });
   };
 
@@ -2124,7 +2151,8 @@ export function ThiDuaLop() {
 }
 
 // 11. BIÊN BẢN BÀN GIAO NGHỈ TẾT & SINH HOẠT HÈ (WORD .DOCX + CRUD)
-export function BienBanBanGiao({ classData }) {
+export function BienBanBanGiao({ maLop, classData }) {
+  const currentLop = maLop || classData?.className || '10A1';
   const [list, setList] = useState([]);
   const [editingId, setEditingId] = useState(null);
   const [editForm, setEditForm] = useState({});
@@ -2137,20 +2165,20 @@ export function BienBanBanGiao({ classData }) {
   });
 
   const loadData = () => {
-    fetch('/api/bangiao')
+    fetch(`/api/bangiao?ma_lop=${encodeURIComponent(currentLop)}`)
       .then(r => r.json())
       .then(data => setList(Array.isArray(data) ? data : []))
       .catch(console.error);
   };
 
-  useEffect(() => { loadData(); }, []);
+  useEffect(() => { loadData(); }, [currentLop]);
 
   const handleCreate = async (e) => {
     e.preventDefault();
     await fetch('/api/bangiao', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(form)
+      body: JSON.stringify({ ...form, ma_lop: currentLop })
     });
     setForm({
       dot_ban_giao: 'Sinh hoạt hè 2026',
@@ -2193,7 +2221,8 @@ export function BienBanBanGiao({ classData }) {
             ngay_ban_giao: parts[1] || new Date().toISOString().slice(0, 10),
             si_so: parseInt(parts[2]) || 0,
             tinh_trang: parts[3] || '',
-            dai_dien_dia_phuong: parts[4] || ''
+            dai_dien_dia_phuong: parts[4] || '',
+            ma_lop: currentLop
           })
         });
       }
@@ -2204,7 +2233,7 @@ export function BienBanBanGiao({ classData }) {
 
   const handleExportWord = () => {
     exportDocxTable({
-      title: 'HỒ SƠ BIÊN BẢN BÀN GIAO HỌC SINH NGHỈ TẾT & HÈ',
+      title: `HỒ SƠ BIÊN BẢN BÀN GIAO HỌC SINH NGHỈ TẾT & HÈ - LỚP ${currentLop}`,
       headers: ['STT', 'Đợt bàn giao', 'Ngày bàn giao', 'Sĩ số', 'Tình trạng nề nếp', 'Đại diện địa phương'],
       rows: list.map((it, idx) => [
         idx + 1,
@@ -2214,7 +2243,7 @@ export function BienBanBanGiao({ classData }) {
         it.tinh_trang,
         it.dai_dien_dia_phuong
       ]),
-      filename: 'Bien_Ban_Ban_Giao_Tet_He'
+      filename: `Bien_Ban_Ban_Giao_Tet_He_${currentLop}`
     });
   };
 
@@ -2307,7 +2336,8 @@ export function BienBanBanGiao({ classData }) {
 }
 
 // 12. BGH KIỂM TRA & NHẬN XÉT SỔ (WORD .DOCX + CRUD)
-export function KiemTraBGH() {
+export function KiemTraBGH({ maLop, classData }) {
+  const currentLop = maLop || classData?.className || '10A1';
   const [list, setList] = useState([]);
   const [editingId, setEditingId] = useState(null);
   const [editForm, setEditForm] = useState({});
@@ -2319,20 +2349,20 @@ export function KiemTraBGH() {
   });
 
   const loadData = () => {
-    fetch('/api/bgh')
+    fetch(`/api/bgh?ma_lop=${encodeURIComponent(currentLop)}`)
       .then(r => r.json())
       .then(data => setList(Array.isArray(data) ? data : []))
       .catch(console.error);
   };
 
-  useEffect(() => { loadData(); }, []);
+  useEffect(() => { loadData(); }, [currentLop]);
 
   const handleCreate = async (e) => {
     e.preventDefault();
     await fetch('/api/bgh', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(form)
+      body: JSON.stringify({ ...form, ma_lop: currentLop })
     });
     setForm({
       dot_kiem_tra: 'Tổng kết Cuối năm học',
@@ -2373,7 +2403,8 @@ export function KiemTraBGH() {
             dot_kiem_tra: parts[0],
             ngay_duyet: parts[1] || new Date().toISOString().slice(0, 10),
             y_kien_bgh: parts[2] || '',
-            xep_loai: parts[3] || 'Tốt'
+            xep_loai: parts[3] || 'Tốt',
+            ma_lop: currentLop
           })
         });
       }
@@ -2384,7 +2415,7 @@ export function KiemTraBGH() {
 
   const handleExportWord = () => {
     exportDocxTable({
-      title: 'Ý KIẾN BAN GIÁM HIỆU KIỂM TRA SỔ CHỦ NHIỆM',
+      title: `Ý KIẾN BAN GIÁM HIỆU KIỂM TRA SỔ CHỦ NHIỆM - LỚP ${currentLop}`,
       headers: ['STT', 'Đợt kiểm tra', 'Ngày duyệt', 'Ý kiến nhận xét BGH', 'Xếp loại'],
       rows: list.map((it, idx) => [
         idx + 1,
@@ -2393,7 +2424,7 @@ export function KiemTraBGH() {
         it.y_kien_bgh,
         it.xep_loai
       ]),
-      filename: 'BGH_Kiem_Tra_So_Chu_Nhiem'
+      filename: `BGH_Kiem_Tra_So_Chu_Nhiem_${currentLop}`
     });
   };
 
