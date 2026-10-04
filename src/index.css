@@ -242,3 +242,35 @@ html.dark * {
 html.light * {
   scrollbar-color: #cbd5e1 #f1f5f9;
 }
+
+/* =========================================================
+   WORD DOCUMENT EDITOR & TIMES NEW ROMAN STANDARDIZATION
+   ========================================================= */
+.font-times,
+.word-editor-canvas,
+.word-editor-canvas * {
+  font-family: "Times New Roman", Times, "Liberation Serif", serif !important;
+}
+
+.word-editor-canvas table {
+  border-collapse: collapse;
+}
+
+.word-editor-canvas table td,
+.word-editor-canvas table th {
+  border: 1px solid #94a3b8;
+  padding: 6px 10px;
+}
+
+@media print {
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+  .word-editor-canvas {
+    font-family: "Times New Roman", Times, serif !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+    border: none !important;
+  }
+}
